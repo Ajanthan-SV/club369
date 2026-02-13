@@ -1,0 +1,24 @@
+import { User } from '../types/auth';
+import { Transaction } from '../types/membership';
+import api from '../utils/api';
+
+export const PaymentService = {
+    createPayment: async (data: any): Promise<any> => {
+        return await api.post('/payments/create/', data);
+    }
+};
+
+export const AdminService = {
+    getUsers: async (): Promise<User[]> => {
+        return await api.get<User[]>('/admin/users/');
+    },
+
+    getTransactions: async (): Promise<Transaction[]> => {
+        return await api.get<Transaction[]>('/admin/transactions/');
+    },
+
+    getCollections: async (): Promise<{ total_last_30_days: number }> => {
+        return await api.get<{ total_last_30_days: number }>('/admin/collections/');
+    }
+};
+

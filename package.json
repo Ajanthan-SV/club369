@@ -1,0 +1,13 @@
+{
+    "name": "club369-integrated",
+    "version": "1.0.0",
+    "scripts": {
+        "install:all": "npm install --prefix club369 && pip install -r backend/requirements.txt",
+        "dev:frontend": "npm run dev --prefix club369",
+        "dev:backend": "cd backend && venv\\Scripts\\activate && python manage.py runserver",
+        "dev": "npx concurrently \"npm run dev:frontend\" \"npm run dev:backend\""
+    },
+    "devDependencies": {
+        "concurrently": "^8.2.2"
+    }
+}
