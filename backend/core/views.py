@@ -49,14 +49,8 @@ class LoginView(TokenObtainPairView):
         }
 
         # 5. View Response (Metadata only)
-        return Response({
-            'id': user.id,
-            'full_name': user.full_name,
-            'email': user.email,
-            'profile_image': user.profile_image.url if user.profile_image else None,
-            'role': user.role,
-            'status': user.status
-        }, status=status.HTTP_200_OK)
+        user_data = UserSerializer(user).data
+        return Response(user_data, status=status.HTTP_200_OK)
 
 class CustomTokenRefreshView(TokenRefreshView):
     """
@@ -112,7 +106,7 @@ class RegisterView(generics.CreateAPIView):
     permission_classes = (permissions.AllowAny,)
     serializer_class = RegisterSerializer
 
-class UserProfileView(generics.RetrieveAPIView):
+class UserProfileView(generics.RetrieveUpdateAPIView):
     serializer_class = UserSerializer
     permission_classes = (permissions.IsAuthenticated,)
 

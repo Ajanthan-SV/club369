@@ -19,14 +19,14 @@ class Base64ImageField(serializers.ImageField):
 class UserSerializer(serializers.ModelSerializer):
     name = serializers.CharField(source='full_name')
     mobile = serializers.CharField(source='phone')
-    profile_picture = serializers.SerializerMethodField()
+    profile_picture = Base64ImageField(source='profile_image', required=False, allow_null=True)
     membership_status = serializers.SerializerMethodField()
     last_payment_date = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = ('id', 'name', 'email', 'mobile', 'profile_picture', 'role', 'status', 'created_at', 'membership_status', 'last_payment_date')
-        read_only_fields = ('role', 'status', 'created_at')
+        read_only_fields = ('id', 'email', 'role', 'status', 'created_at')
 
     def get_profile_picture(self, obj):
         return obj.profile_image.url if obj.profile_image else None
