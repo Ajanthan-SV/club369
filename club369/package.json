@@ -11,7 +11,6 @@
   "dependencies": {
     "@reduxjs/toolkit": "^2.11.2",
     "axios": "^1.13.5",
-    "club369-integrated": "file:..",
     "framer-motion": "^12.33.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
