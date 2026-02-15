@@ -7,11 +7,17 @@ class StandardizedJSONRenderer(JSONRenderer):
         # Determine success based on status code
         success = response.status_code < 400
         
+        # If data is already in the standardized format, return as is to avoid double wrapping
+        if isinstance(data, dict) and 'success' in data and ('data' in data or 'errors' in data):
+            # Ensure message exists
+            if 'message' not in data:
+                data['message'] = ""
+            return super().render(data, accepted_media_type, renderer_context)
+
         # Standardize message
         message = ""
+        # ... rest of the logic ...
         if isinstance(data, dict):
-            # Only pop 'message'. For 'status', just use it as a fallback if message is empty, 
-            # but don't remove it from the data block as it might be important domain data (like user account status).
             message = data.pop('message', "")
             if not message:
                 message = data.get('status', "")
@@ -31,7 +37,6 @@ class StandardizedJSONRenderer(JSONRenderer):
         if not success:
             errors = data
             if isinstance(data, dict) and ('error' in data or 'detail' in data):
-                # If it's a simple error message, we already have it in 'message'
                 pass
         
         standardized_data = {

@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import Navbar from '../../components/layout/Navbar';
-import Footer from '../../components/layout/Footer';
-import { motion, useMotionValue, useTransform, useSpring } from 'framer-motion';
-import { PaymentService } from '../../services/PaymentService';
-import { useAuth } from '../../context/AuthContext';
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import Navbar from "../../components/layout/Navbar";
+import Footer from "../../components/layout/Footer";
+import { motion, useMotionValue, useTransform, useSpring } from "framer-motion";
+import { PaymentService } from "../../services/PaymentService";
+import { useAuth } from "../../context/AuthContext";
 
 const Checkout: React.FC = () => {
   const { user } = useAuth();
@@ -21,9 +21,16 @@ const Checkout: React.FC = () => {
       });
     };
 
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
+    window.addEventListener("mousemove", handleMouseMove);
+    return () => window.removeEventListener("mousemove", handleMouseMove);
   }, []);
+
+  // Redirect active members to dashboard
+  useEffect(() => {
+    if (user?.membership_status === "ACTIVE") {
+      navigate('/dashboard');
+    }
+  }, [user, navigate]);
 
   // 3D Card Effect Logic
   const x = useMotionValue(0);
@@ -42,7 +49,10 @@ const Checkout: React.FC = () => {
     x.set(xPct);
     y.set(yPct);
   };
-  const handleMouseLeave = () => { x.set(0); y.set(0); };
+  const handleMouseLeave = () => {
+    x.set(0);
+    y.set(0);
+  };
   const rotateX = useTransform(mouseY, [-0.5, 0.5], [10, -10]);
   const rotateY = useTransform(mouseX, [-0.5, 0.5], [-10, 10]);
 
@@ -50,26 +60,31 @@ const Checkout: React.FC = () => {
     setIsLoading(true);
 
     try {
-      await PaymentService.initiatePayment({
-        amount: 4999 * 100,
-        name: "CLUB369",
-        description: "Obsidian Monthly Subscription",
+      await PaymentService.handlePayment({
         prefill: {
           name: user?.name || "New Member",
           email: user?.email || "member@club369.com",
-          contact: "9999999999"
+          contact: user?.mobile || "9999999999"
         },
-        handler: (response: any) => {
-          console.log("Payment ID: ", response.razorpay_payment_id);
-          alert("Autopay Authorized Successfully.");
-          navigate('/dashboard');
+        onSuccess: (verifyRes) => {
+          if (verifyRes) {
+            alert("Payment Verified & Membership Activated!");
+            navigate('/dashboard');
+          }
+          setIsLoading(false);
         },
-        modal: {
-          ondismiss: () => setIsLoading(false)
+        onDismiss: () => {
+          setIsLoading(false);
+        },
+        onError: (error: any) => {
+          console.error("Payment Error:", error);
+          const errorMsg = error.message || "Could not connect to payment gateway.";
+          alert(errorMsg);
+          setIsLoading(false);
         }
       });
     } catch (error: any) {
-      alert(error.message);
+      console.error("Payment Initiation Error:", error);
       setIsLoading(false);
     }
   };
@@ -156,7 +171,7 @@ const Checkout: React.FC = () => {
           style={{
             backgroundImage: `linear-gradient(rgba(139, 92, 246, 0.3) 1px, transparent 1px),
                              linear-gradient(90deg, rgba(139, 92, 246, 0.3) 1px, transparent 1px)`,
-            backgroundSize: '50px 50px',
+            backgroundSize: "50px 50px",
             x: mousePosition.x * 0.5,
             y: mousePosition.y * 0.5,
           }}
@@ -185,7 +200,6 @@ const Checkout: React.FC = () => {
       </div>
 
       <main className="w-full max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 items-center min-h-[90vh] p-6 pt-32 flex-grow relative z-10">
-
         {/* Left: Summary with Animations */}
         <div className="flex flex-col gap-6">
           <motion.h1
@@ -198,7 +212,8 @@ const Checkout: React.FC = () => {
               y: mousePosition.y * -0.5,
             }}
           >
-            Initialize <br />{' '}
+            Initialize your
+            <br />{" "}
             <motion.span
               className="text-primary"
               animate={{
@@ -213,7 +228,7 @@ const Checkout: React.FC = () => {
                 repeat: Infinity,
               }}
             >
-              Autopay
+              Access
             </motion.span>
           </motion.h1>
 
@@ -223,11 +238,12 @@ const Checkout: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.6 }}
           >
-            Activate your membership via secure subscription. Your card will be charged monthly to maintain access to the ecosystem.
+            Activate your membership via our secure gateway. Secure your access
+            to the ecosystem for the next 30 days.
           </motion.p>
 
           <motion.div
-            className="bg-[#161118] border border-white/10 rounded-xl p-6 space-y-4 relative overflow-hidden"
+            className="bg-[#161118] border border-white/10 rounded-xl p-6 space-y-5 relative overflow-hidden"
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ delay: 0.4, duration: 0.6 }}
@@ -246,38 +262,96 @@ const Checkout: React.FC = () => {
               }}
             />
 
-            <motion.div
-              className="flex justify-between items-center text-sm text-gray-500 relative z-10"
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.6 }}
-            >
-              <span>Subscription Plan</span>
-              <span className="text-white font-bold">Obsidian Tier (Monthly)</span>
-            </motion.div>
+            {/* Header Section */}
+            <div className="space-y-3 relative z-10 border-b border-white/5 pb-4">
+              <motion.div
+                className="flex justify-between items-center text-sm text-gray-500"
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.6 }}
+              >
+                <span>Subscription Plan</span>
+                <span className="text-white font-bold">
+                  Membership Plan (Monthly)
+                </span>
+              </motion.div>
 
-            <motion.div
-              className="flex justify-between items-center text-sm text-gray-500 relative z-10"
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.7 }}
-            >
-              <span>Billing Cycle</span>
-              <span className="text-white">Every 30 Days</span>
-            </motion.div>
+              <motion.div
+                className="flex justify-between items-center text-sm text-gray-500"
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.7 }}
+              >
+                <span>Billing Cycle</span>
+                <span className="text-white">Every 30 Days</span>
+              </motion.div>
+            </div>
+
+            {/* Membership Goals / Opportunities Section */}
+            <div className="space-y-4 relative z-10">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-primary/80">
+                Membership Benefits
+              </p>
+
+              {[
+                {
+                  icon: "hub",
+                  title: "Club Access",
+                  desc: "Complimentary access to all ventures.",
+                },
+                {
+                  icon: "groups",
+                  title: "Club Meetups",
+                  desc: "Regular industry expert sessions.",
+                },
+                {
+                  icon: "health_and_safety",
+                  title: "Medical Coverage",
+                  desc: "Insured coverage up to ₹2 Lakh.",
+                },
+              ].map((goal, index) => (
+                <motion.div
+                  key={index}
+                  className="flex items-start gap-3"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.8 + index * 0.1 }}
+                >
+                  <span className="material-symbols-outlined text-primary text-lg mt-0.5">
+                    {goal.icon}
+                  </span>
+                  <div className="flex flex-col">
+                    <span className="text-xs font-bold text-white uppercase tracking-tight">
+                      {goal.title}
+                    </span>
+                    <span className="text-[10px] text-gray-400 leading-tight">
+                      {goal.desc}
+                    </span>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
 
             <div className="h-px bg-white/10 my-2 relative z-10"></div>
 
+            {/* Footer Section */}
             <motion.div
               className="flex justify-between items-center text-xl font-bold relative z-10"
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.8 }}
+              transition={{ delay: 1.2 }}
             >
-              <span>Monthly Charge</span>
+              <span className="text-sm text-gray-400 font-medium">
+                Monthly Charge
+              </span>
               <motion.span
                 animate={{
-                  color: ["#ffffff", "#8b5cf6", "#ffffff"],
+                  textShadow: [
+                    "0 0 10px rgba(139, 92, 246, 0.3)",
+                    "0 0 20px rgba(139, 92, 246, 0.6)",
+                    "0 0 10px rgba(139, 92, 246, 0.3)",
+                  ],
+                  color: ["#ffffff", "#af25f4", "#ffffff"],
                 }}
                 transition={{
                   duration: 3,
@@ -287,44 +361,6 @@ const Checkout: React.FC = () => {
                 ₹ 4,999
               </motion.span>
             </motion.div>
-          </motion.div>
-
-          <motion.div
-            className="flex items-start gap-3 p-4 bg-primary/10 border border-primary/20 rounded-lg relative overflow-hidden"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 1.0, duration: 0.6 }}
-            whileHover={{ borderColor: "rgba(139, 92, 246, 0.4)" }}
-          >
-            {/* Animated background */}
-            <motion.div
-              className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent"
-              animate={{
-                opacity: [0.3, 0.5, 0.3],
-              }}
-              transition={{
-                duration: 3,
-                repeat: Infinity,
-              }}
-            />
-
-            <motion.span
-              className="material-symbols-outlined text-primary mt-0.5 relative z-10"
-              animate={{
-                rotate: [0, 360],
-              }}
-              transition={{
-                duration: 3,
-                repeat: Infinity,
-                ease: "linear",
-              }}
-            >
-              autorenew
-            </motion.span>
-            <div className="text-sm text-gray-300 relative z-10">
-              <p className="font-bold text-white mb-1">Automatic Renewal</p>
-              <p>By proceeding, you authorize CLUB369 to charge your payment method automatically on the renewal date. You can cancel anytime from the dashboard.</p>
-            </div>
           </motion.div>
         </div>
 
@@ -434,7 +470,9 @@ const Checkout: React.FC = () => {
                   >
                     Subscription
                   </motion.span>
-                  <span className="text-[10px] text-gray-500 uppercase">Secure Gateway</span>
+                  <span className="text-[10px] text-gray-500 uppercase">
+                    Secure Gateway
+                  </span>
                 </div>
               </motion.div>
 
@@ -444,7 +482,9 @@ const Checkout: React.FC = () => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 1.0 }}
               >
-                <div className="text-gray-500 text-xs uppercase font-bold">Recurring Amount</div>
+                <div className="text-gray-500 text-xs uppercase font-bold">
+                  Recurring Amount
+                </div>
                 <motion.div
                   className="text-4xl font-bold text-white"
                   animate={{
@@ -459,7 +499,8 @@ const Checkout: React.FC = () => {
                     repeat: Infinity,
                   }}
                 >
-                  ₹ 4,999<span className="text-lg text-gray-500 font-normal">/mo</span>
+                  ₹ 4,999
+                  <span className="text-lg text-gray-500 font-normal">/mo</span>
                 </motion.div>
               </motion.div>
 
@@ -470,7 +511,11 @@ const Checkout: React.FC = () => {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 1.2 }}
-                whileHover={{ scale: 1.02, y: -3, boxShadow: "0 10px 40px rgba(0, 0, 0, 0.3)" }}
+                whileHover={{
+                  scale: 1.02,
+                  y: -3,
+                  boxShadow: "0 10px 40px rgba(0, 0, 0, 0.3)",
+                }}
                 whileTap={{ scale: 0.98 }}
               >
                 {/* Shine effect */}
@@ -486,16 +531,22 @@ const Checkout: React.FC = () => {
                   <motion.span
                     className="material-symbols-outlined"
                     animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                    transition={{
+                      duration: 1,
+                      repeat: Infinity,
+                      ease: "linear",
+                    }}
                   >
                     progress_activity
                   </motion.span>
                 )}
 
                 <span className="relative z-10">
-                  {isLoading ? 'Processing...' : (
+                  {isLoading ? (
+                    "Processing..."
+                  ) : (
                     <>
-                      <span>Authorize Autopay</span>
+                      <span>Authorize Payment</span>
                       <motion.span
                         className="material-symbols-outlined text-sm inline-block ml-2"
                         animate={{ x: [0, 5, 0] }}

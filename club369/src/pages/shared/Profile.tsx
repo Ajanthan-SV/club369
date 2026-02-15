@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
+import { AuthService } from '../../services/AuthService';
 import { getFullUrl } from '../../utils/url';
 import { formatDate } from '../../utils/date';
 
@@ -12,6 +13,7 @@ const Profile: React.FC = () => {
         mobile: user?.mobile || '',
     });
     const [profilePic, setProfilePic] = useState<string | null>(user?.profile_picture || null);
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [saveLoading, setSaveLoading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -20,6 +22,11 @@ const Profile: React.FC = () => {
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
+            if (file.size > 1024 * 1024) {
+                alert("File size exceeds 1MB limit");
+                return;
+            }
+            setSelectedFile(file);
             const reader = new FileReader();
             reader.onloadend = () => {
                 setProfilePic(reader.result as string);
@@ -31,22 +38,35 @@ const Profile: React.FC = () => {
     const handleSave = async () => {
         setSaveLoading(true);
         try {
+            // 1. If new file selected, handle Cloudinary upload
+            if (selectedFile) {
+                // Get signed upload config
+                const signatureData = await AuthService.getUploadSignature();
+
+                // Upload to Cloudinary
+                const cloudinaryResponse = await AuthService.uploadToCloudinary(selectedFile, signatureData);
+
+                // Save to backend
+                await AuthService.saveProfilePic(
+                    cloudinaryResponse.secure_url,
+                    cloudinaryResponse.public_id
+                );
+            }
+
+            // 2. Update other profile data
             const updateData: any = {
                 name: formData.name,
                 mobile: formData.mobile,
             };
 
-            if (profilePic && profilePic.startsWith('data:image')) {
-                updateData.profile_picture = profilePic;
-            }
-
             await updateProfile(updateData);
 
             alert('Profile updated successfully!');
             setIsEditing(false);
-        } catch (err) {
+            setSelectedFile(null);
+        } catch (err: any) {
             console.error("Save error:", err);
-            alert('Failed to update profile.');
+            alert(err.message || 'Failed to update profile.');
         } finally {
             setSaveLoading(false);
         }

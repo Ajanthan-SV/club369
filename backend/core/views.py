@@ -5,7 +5,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from django.utils import timezone
 from django.db import transaction
 from rest_framework_simplejwt.tokens import RefreshToken
-from .models import User, Membership, Payment, TransactionLedger, Voucher, UserVoucher, AdminActivityLog
+from .models import User, Membership, Payment, TransactionLedger, Voucher, UserVoucher, AdminActivityLog, PaymentOrder
 from .serializers import (
     UserSerializer, RegisterSerializer, 
     MembershipSerializer, PaymentSerializer, TransactionLedgerSerializer, 
@@ -13,6 +13,15 @@ from .serializers import (
     MembershipDetailSerializer, AdminVoucherSerializer
 )
 from django.conf import settings
+import os
+import razorpay
+import json
+import time
+import cloudinary.utils
+import cloudinary.uploader
+from django.views.decorators.csrf import csrf_exempt
+from rest_framework.views import APIView
+from rest_framework.decorators import api_view, permission_classes
 
 # --- Authentication ---
 
@@ -89,7 +98,7 @@ class LogoutView(views.APIView):
     1. Destroys Django session.
     2. Instructs browser to delete cookies.
     """
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.AllowAny,)
 
     def post(self, request):
         # 1. Session Invalidation
@@ -123,93 +132,351 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
 
 # --- Membership & Payments ---
 
-class CreatePaymentView(views.APIView):
+client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
+
+class CreateRazorpayOrderView(views.APIView):
     permission_classes = (permissions.IsAuthenticated,)
 
-    @transaction.atomic
+    def post(self, request):
+        amount =4999 * 100 
+        
+        order_data = {
+            'amount': amount,
+            'currency': 'INR',
+            'payment_capture': 1 
+        }
+        
+        try:
+            razorpay_order = client.order.create(data=order_data)
+            
+            # Save the secure order reference
+            PaymentOrder.objects.create(
+                user=request.user,
+                razorpay_order_id=razorpay_order.get("id"),
+                amount=amount / 100, # Store in actual currency unit (₹)
+                currency='INR',
+                status="CREATED"
+            )
+
+            # Wrap in StandardizedResponse format
+            return Response({
+                "success": True,
+                "message": "Order initiated successfully",
+                "data": razorpay_order
+            }, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({
+                "success": False,
+                "message": "Failed to create order",
+                "errors": str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+class VerifyPaymentView(views.APIView):
+    permission_classes = (permissions.IsAuthenticated,)
+
     def post(self, request):
         user = request.user
-        # Allow users with 'PENDING' or 'ACTIVE' status (standard renewals)
-        if user.status not in ['PENDING', 'ACTIVE']:
-            return Response({'error': f'User account status {user.status} does not allow payments'}, status=status.HTTP_403_FORBIDDEN)
-
-        current_date = timezone.now().date()
-        
-        # Check for existing active membership
-        existing_membership = Membership.objects.filter(user=user, status='ACTIVE').order_by('-end_date').first()
-        
-        start_date = current_date
-        
-        if existing_membership:
-            # Rule 1: Renewal Window Enforcement (5 days before end_date)
-            renewal_allowed_date = existing_membership.end_date - timezone.timedelta(days=5)
-            
-            if current_date < renewal_allowed_date:
-                return Response(
-                    {"error": "Membership already active or payment already processed"}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            # Rule 2: Duplicate Payment Protection
-            # Check if a successful payment already exists for the renewal of this membership
-            # (i.e., a membership starting after the current one)
-            if Membership.objects.filter(user=user, start_date=existing_membership.end_date + timezone.timedelta(days=1)).exists():
-                 return Response(
-                    {"error": "Membership already active or payment already processed"}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-            # Renewal Flow: new_start_date = current_end_date + 1
-            start_date = existing_membership.end_date + timezone.timedelta(days=1)
-
         data = request.data
-        membership_data = data.get('membership', {})
-        payment_data = data.get('payment', {})
-
-        # Create Membership
-        # Default duration is 30 days as per renewal logic instruction
-        end_date = start_date + timezone.timedelta(days=30)
         
-        membership = Membership.objects.create(
-            user=user,
-            plan_name=membership_data.get('plan_name', 'Standard Renewal'),
-            amount=membership_data.get('amount', 0),
-            start_date=start_date,
-            end_date=end_date,
-            status='ACTIVE'
-        )
+        razorpay_payment_id = data.get('razorpay_payment_id')
+        razorpay_order_id = data.get('razorpay_order_id')
+        razorpay_signature = data.get('razorpay_signature')
 
-        # Create Payment
-        payment = Payment.objects.create(
-            user=user,
-            membership=membership,
-            amount=payment_data.get('amount', 0),
-            payment_mode=payment_data.get('payment_mode', 'UPI'),
-            transaction_id=payment_data.get('transaction_id'),
-            payment_status='SUCCESS', # Mock successful payment for MVP
-            paid_at=timezone.now()
-        )
+        # 1. Idempotency Check: Already processed?
+        if Payment.objects.filter(transaction_id=razorpay_payment_id).exists():
+            print(f"DEBUG: Verify - Payment already processed by webhook for {razorpay_payment_id}")
+            return Response({
+                "success": True,
+                "message": "Payment already verified via backup webhook",
+                "data": {
+                    "transaction_id": razorpay_payment_id,
+                }
+            }, status=status.HTTP_200_OK)
 
-        # Create Ledger Entry
-        TransactionLedger.objects.create(
-            payment=payment,
-            user=user,
-            amount=payment.amount,
-            transaction_type='CREDIT',
-            description=f"Membership payment for {membership.plan_name}"
-        )
+        # 2. Validate Order exists and belongs to user
+        order = PaymentOrder.objects.filter(
+            razorpay_order_id=razorpay_order_id,
+            user=user
+        ).first()
 
-        # Update user status to ACTIVE if it was PENDING
-        if user.status == 'PENDING':
-            user.status = 'ACTIVE'
-            user.save()
+        if not order:
+            print(f"DEBUG: Verify failed - Order not found or user mismatch: {razorpay_order_id}")
+            return Response({
+                "success": False,
+                "message": "Invalid or unauthorized order reference",
+                "data": None
+            }, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response({
-            'status': 'Payment processed successfully', 
-            'membership_id': membership.id,
-            'start_date': start_date,
-            'end_date': end_date
-        })
+        params_dict = {
+            'razorpay_order_id': razorpay_order_id,
+            'razorpay_payment_id': razorpay_payment_id,
+            'razorpay_signature': razorpay_signature
+        }
+
+        # 3. Signature Verification
+        try:
+            client.utility.verify_payment_signature(params_dict)
+        except Exception:
+            return Response({
+                "success": False,
+                "message": "Invalid payment signature.",
+                "data": None
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # 4. Fetch actual payment details
+        try:
+            payment_details = client.payment.fetch(razorpay_payment_id)
+            raw_method = payment_details.get('method', 'CARD').upper()
+            method_mapping = {
+                'CARD': 'CARD',
+                'UPI': 'UPI',
+                'NETBANKING': 'NETBANKING',
+                'WALLET': 'UPI',
+            }
+            final_payment_mode = method_mapping.get(raw_method, 'CARD')
+        except Exception:
+            final_payment_mode = 'CARD'
+
+        # 5. Create Database Records inside transaction
+        try:
+            with transaction.atomic():
+                current_date = timezone.now().date()
+                existing_membership = Membership.objects.filter(user=user, status='ACTIVE').order_by('-end_date').first()
+                
+                start_date = current_date
+                if existing_membership:
+                    start_date = existing_membership.end_date + timezone.timedelta(days=1)
+
+                membership = Membership.objects.create(
+                    user=user,
+                    plan_name='Membership Plan',
+                    amount=order.amount,
+                    start_date=start_date,
+                    end_date=start_date + timezone.timedelta(days=30),
+                    status='ACTIVE'
+                )
+
+                payment = Payment.objects.create(
+                    user=user,
+                    membership=membership,
+                    amount=order.amount,
+                    payment_mode=final_payment_mode,
+                    transaction_id=razorpay_payment_id,
+                    payment_status='SUCCESS',
+                    paid_at=timezone.now()
+                )
+
+                TransactionLedger.objects.create(
+                    payment=payment,
+                    user=user,
+                    amount=order.amount,
+                    transaction_type='CREDIT',
+                    description=f"Verified {final_payment_mode} payment: {razorpay_payment_id}"
+                )
+
+                if user.status == 'PENDING':
+                    user.status = 'ACTIVE'
+                    user.save()
+
+                # 6. Mark Order as COMPLETED
+                order.status = "COMPLETED"
+                order.save(update_fields=["status"])
+                
+            return Response({
+                "success": True,
+                "message": "Payment verified and membership activated",
+                "data": {
+                    "method_used": final_payment_mode,
+                    "transaction_id": razorpay_payment_id,
+                    "membership_end_date": membership.end_date
+                }
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({
+                "success": False,
+                "message": "Activation failed after payment confirmation",
+                "errors": str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+from django.utils.decorators import method_decorator
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class RazorpayWebhookView(APIView):
+    """
+    Backup processor:
+    If the frontend verification fails (e.g. browser close), Razorpay will call this.
+    """
+    permission_classes = [] 
+
+    def post(self, request):
+        webhook_secret = getattr(settings, "RAZORPAY_WEBHOOK_SECRET", None)
+        if not webhook_secret:
+            return Response({"error": "Webhook secret not configured"}, status=status.HTTP_200_OK)
+
+        received_signature = request.headers.get("X-Razorpay-Signature")
+        body = request.body
+
+        try:
+            client.utility.verify_webhook_signature(
+                body.decode('utf-8'),
+                received_signature,
+                webhook_secret
+            )
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        payload = json.loads(body)
+        event = payload.get("event")
+
+        if event == "payment.captured":
+            payment_entity = payload["payload"]["payment"]["entity"]
+            razorpay_payment_id = payment_entity["id"]
+            razorpay_order_id = payment_entity["order_id"]
+
+            if Payment.objects.filter(transaction_id=razorpay_payment_id).exists():
+                return Response({"status": "already processed"}, status=status.HTTP_200_OK)
+
+            order = PaymentOrder.objects.filter(
+                razorpay_order_id=razorpay_order_id
+            ).select_related('user').first()
+
+            if not order:
+                return Response({"status": "order not found"}, status=status.HTTP_200_OK)
+
+            user = order.user
+
+            with transaction.atomic():
+                current_date = timezone.now().date()
+                existing_membership = Membership.objects.filter(user=user, status='ACTIVE').order_by('-end_date').first()
+                
+                start_date = current_date
+                if existing_membership:
+                    start_date = existing_membership.end_date + timezone.timedelta(days=1)
+
+                membership = Membership.objects.create(
+                    user=user,
+                    plan_name="Membership Plan",
+                    amount=order.amount,
+                    start_date=start_date,
+                    end_date=start_date + timezone.timedelta(days=30),
+                    status="ACTIVE"
+                )
+
+                user.status = 'ACTIVE'
+                user.save()
+
+                payment = Payment.objects.create(
+                    user=user,
+                    membership=membership,
+                    amount=order.amount,
+                    payment_mode=payment_entity.get("method", "CARD").upper(),
+                    transaction_id=razorpay_payment_id,
+                    payment_status="SUCCESS",
+                    paid_at=timezone.now()
+                )
+
+                TransactionLedger.objects.create(
+                    payment=payment,
+                    user=user,
+                    amount=order.amount,
+                    transaction_type="CREDIT",
+                    description=f"Webhook verified payment {razorpay_payment_id}"
+                )
+
+                order.status = "COMPLETED"
+                order.save(update_fields=["status"])
+
+        return Response({"status": "event processed"}, status=status.HTTP_200_OK)
+
+# class CreatePaymentView(views.APIView):
+#     permission_classes = (permissions.IsAuthenticated,)
+
+#     @transaction.atomic
+#     def post(self, request):
+#         user = request.user
+#         # Allow users with 'PENDING' or 'ACTIVE' status (standard renewals)
+#         if user.status not in ['PENDING', 'ACTIVE']:
+#             return Response({'error': f'User account status {user.status} does not allow payments'}, status=status.HTTP_403_FORBIDDEN)
+
+#         current_date = timezone.now().date()
+        
+#         # Check for existing active membership
+#         existing_membership = Membership.objects.filter(user=user, status='ACTIVE').order_by('-end_date').first()
+        
+#         start_date = current_date
+        
+#         if existing_membership:
+#             # Rule 1: Renewal Window Enforcement (5 days before end_date)
+#             renewal_allowed_date = existing_membership.end_date - timezone.timedelta(days=5)
+            
+#             if current_date < renewal_allowed_date:
+#                 return Response(
+#                     {"error": "Membership already active or payment already processed"}, 
+#                     status=status.HTTP_400_BAD_REQUEST
+#                 )
+            
+#             # Rule 2: Duplicate Payment Protection
+#             # Check if a successful payment already exists for the renewal of this membership
+#             # (i.e., a membership starting after the current one)
+#             if Membership.objects.filter(user=user, start_date=existing_membership.end_date + timezone.timedelta(days=1)).exists():
+#                  return Response(
+#                     {"error": "Membership already active or payment already processed"}, 
+#                     status=status.HTTP_400_BAD_REQUEST
+#                 )
+
+#             # Renewal Flow: new_start_date = current_end_date + 1
+#             start_date = existing_membership.end_date + timezone.timedelta(days=1)
+
+#         data = request.data
+#         membership_data = data.get('membership', {})
+#         payment_data = data.get('payment', {})
+
+#         # Create Membership
+#         # Default duration is 30 days as per renewal logic instruction
+#         end_date = start_date + timezone.timedelta(days=30)
+        
+#         membership = Membership.objects.create(
+#             user=user,
+#             plan_name=membership_data.get('plan_name', 'Standard Renewal'),
+#             amount=membership_data.get('amount', 0),
+#             start_date=start_date,
+#             end_date=end_date,
+#             status='ACTIVE'
+#         )
+
+#         # Create Payment
+#         payment = Payment.objects.create(
+#             user=user,
+#             membership=membership,
+#             amount=payment_data.get('amount', 0),
+#             payment_mode=payment_data.get('payment_mode', 'UPI'),
+#             transaction_id=payment_data.get('transaction_id'),
+#             payment_status='SUCCESS', # Mock successful payment for MVP
+#             paid_at=timezone.now()
+#         )
+
+#         # Create Ledger Entry
+#         TransactionLedger.objects.create(
+#             payment=payment,
+#             user=user,
+#             amount=payment.amount,
+#             transaction_type='CREDIT',
+#             description=f"Membership payment for {membership.plan_name}"
+#         )
+
+#         # Update user status to ACTIVE if it was PENDING
+#         if user.status == 'PENDING':
+#             user.status = 'ACTIVE'
+#             user.save()
+
+#         return Response({
+#             'status': 'Payment processed successfully', 
+#             'membership_id': membership.id,
+#             'start_date': start_date,
+#             'end_date': end_date
+#         })
 
 class MembershipDetailView(generics.RetrieveAPIView):
     serializer_class = MembershipDetailSerializer
@@ -345,3 +612,66 @@ class AdminVoucherDeleteView(views.APIView):
             return Response({'status': 'Voucher deleted'})
         except Voucher.DoesNotExist:
             return Response({'error': 'Voucher not found'}, status=404)
+
+# --- Profile Picture Management (Cloudinary) ---
+
+class GetUploadSignatureView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        timestamp = int(time.time())
+        folder = f"club369/profile_pics/{request.user.id}"
+        transformation = "c_fill,w_200,h_200,q_auto:good"
+
+        params_to_sign = {
+            "timestamp": timestamp,
+            "folder": folder,
+            "transformation": transformation
+        }
+
+        signature = cloudinary.utils.api_sign_request(
+            params_to_sign,
+            os.getenv("CLOUDINARY_API_SECRET")
+        )
+
+        return Response({
+            "cloud_name": os.getenv("CLOUDINARY_CLOUD_NAME"),
+            "api_key": os.getenv("CLOUDINARY_API_KEY"),
+            "timestamp": timestamp,
+            "signature": signature,
+            "folder": folder,
+            "transformation": transformation
+        })
+
+class SaveProfilePicView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        new_url = request.data.get("secure_url")
+        new_public_id = request.data.get("public_id")
+
+        if not new_url or not new_public_id:
+            return Response({
+                "status": "error",
+                "message": "Invalid image data"
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Delete old image if exists
+        if user.profile_pic_public_id:
+            try:
+                cloudinary.uploader.destroy(user.profile_pic_public_id)
+            except Exception:
+                pass  # Avoid breaking flow
+
+        # Save new image metadata
+        user.profile_pic = new_url
+        user.profile_pic_public_id = new_public_id
+        user.save()
+
+        return Response({
+            "status": "success",
+            "message": "Profile picture updated",
+            "image_url": new_url
+        }, status=status.HTTP_200_OK)
+

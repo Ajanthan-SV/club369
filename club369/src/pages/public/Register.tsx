@@ -264,6 +264,9 @@ const Register: React.FC = () => {
                                 required
                             />
                         </div>
+                        <div className="text-xs text-gray-500">
+                            Note : Please upload your profile picture to register without any Errors. Dont Miss it.
+                        </div>
 
                         <motion.button
                             type="submit"

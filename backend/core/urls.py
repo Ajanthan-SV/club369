@@ -1,14 +1,13 @@
 from django.urls import path
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from .views import (
-    RegisterView, LogoutView, UserProfileView,
-    CreatePaymentView, VoucherListView, ClaimVoucherView,
+    RegisterView, LogoutView, UserProfileView, VoucherListView, ClaimVoucherView,
     AdminUserListView, AdminTransactionListView, AdminCollectionsView, LoginView,
     CustomTokenRefreshView, MembershipDetailView, UserTransactionListView,
     AdminVoucherListView, AdminVoucherCreateView, AdminVoucherDeleteView, AdminVoucherToggleView,
-    AdminUserDeleteView
+    AdminUserDeleteView, CreateRazorpayOrderView, VerifyPaymentView, RazorpayWebhookView,
+    GetUploadSignatureView, SaveProfilePicView
 )
-
 
 
 urlpatterns = [
@@ -20,9 +19,18 @@ urlpatterns = [
     path('auth/me/', UserProfileView.as_view(), name='me'),
 
     # Membership & Payment
-    path('payments/create/', CreatePaymentView.as_view(), name='create-payment'),
+    path('payments/webhook/', RazorpayWebhookView.as_view(), name='razorpay-webhook'),
+    # Step 1: Initialize the payment
+    path('payments/create-order/', CreateRazorpayOrderView.as_view(), name='create-razorpay-order'),
+    # Step 2: Confirm the payment
+    path('payments/verify/', VerifyPaymentView.as_view(), name='verify-payment'),
+    # path('payments/create/', CreatePaymentView.as_view(), name='create-payment'),
     path('membership/details/', MembershipDetailView.as_view(), name='membership-details'),
     path('membership/transactions/', UserTransactionListView.as_view(), name='membership-transactions'),
+
+    # Profile Picture Management
+    path('profile/upload-signature/', GetUploadSignatureView.as_view(), name='get-upload-signature'),
+    path('profile/save-picture/', SaveProfilePicView.as_view(), name='save-profile-pic'),
 
     # Vouchers
 

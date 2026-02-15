@@ -33,24 +33,31 @@ const RenewButton: React.FC<RenewButtonProps> = ({ status, expiryDate, amount, e
 
         setIsProcessing(true);
         try {
-            await PaymentService.initiatePayment({
-                amount,
-                email,
-                name,
-                mobile,
-                onSuccess: (response) => {
-                    console.log('Payment Success:', response);
-                    alert('Membership renewed successfully!');
-                    navigate('/dashboard');
+            await PaymentService.handlePayment({
+                prefill: {
+                    name,
+                    email,
+                    contact: mobile
+                },
+                onSuccess: (verifyRes) => {
+                    if (verifyRes) {
+                        alert('Membership renewed successfully!');
+                        navigate('/dashboard');
+                    }
                     setIsProcessing(false);
                 },
-                onCancel: () => {
+                onDismiss: () => {
+                    setIsProcessing(false);
+                },
+                onError: (error: any) => {
+                    console.error('Payment Error:', error);
+                    const errorMsg = error.message || 'Failed to initiate payment. Please try again.';
+                    alert(errorMsg);
                     setIsProcessing(false);
                 }
             });
         } catch (error) {
-            console.error('Payment Error:', error);
-            alert('Failed to initiate payment. Please try again.');
+            console.error('Payment Initiation Error:', error);
             setIsProcessing(false);
         }
     };

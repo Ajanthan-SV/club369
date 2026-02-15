@@ -14,6 +14,7 @@ import { AuthService } from '../../services/AuthService';
 export const performLogout = () => async (dispatch: AppDispatch) => {
     try {
         // 1. Backend Logout (Clears cookies)
+        // Since LogoutView is now AllowAny, this always succeeds in clearing browser cookies
         await dispatch(authApi.endpoints.logout.initiate()).unwrap();
     } catch (error) {
         console.error('Logout API failed:', error);

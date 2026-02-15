@@ -4,9 +4,6 @@ import Footer from '../../components/layout/Footer';
 import { motion, useScroll, useTransform, useSpring } from 'framer-motion';
 
 const Contact: React.FC = () => {
-    const [formState, setFormState] = useState({ name: '', email: '', subject: 'Membership Inquiry', message: '' });
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [submitted, setSubmitted] = useState(false);
     const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
     const containerRef = useRef(null);
 
@@ -40,16 +37,6 @@ const Contact: React.FC = () => {
         window.addEventListener('mousemove', handleMouseMove);
         return () => window.removeEventListener('mousemove', handleMouseMove);
     }, []);
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        setIsSubmitting(true);
-        // Simulate API call
-        setTimeout(() => {
-            setIsSubmitting(false);
-            setSubmitted(true);
-        }, 1500);
-    };
 
     return (
         <div ref={containerRef} className="min-h-screen font-display text-white selection:bg-primary selection:text-white flex flex-col overflow-hidden">
@@ -138,7 +125,7 @@ const Contact: React.FC = () => {
                 />
             </div>
 
-            <main className="relative z-10 pt-32 pb-20 px-6 max-w-7xl mx-auto flex-grow w-full">
+            <main className="relative z-10 pt-32 pb-20 px-6 max-w-4xl mx-auto flex-grow w-full">
 
                 {/* Hero Section with Parallax */}
                 <div className="text-center mb-20 relative">
@@ -200,312 +187,126 @@ const Contact: React.FC = () => {
                     </motion.h1>
                 </div>
 
-                <div className="grid lg:grid-cols-2 gap-16">
-
-                    {/* Contact Info with Parallax */}
+                {/* Contact Info - Centered */}
+                <motion.div
+                    initial={{ opacity: 0, y: 50 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                    className="space-y-12 max-w-2xl mx-auto"
+                >
+                    {/* Headquarters */}
                     <motion.div
-                        initial={{ opacity: 0, x: -50 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.2 }}
-                        className="space-y-12"
+                        initial={{ opacity: 0, y: 30 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
+                        whileHover={{ x: 10 }}
+                        transition={{ duration: 0.3 }}
                     >
-                        {/* Headquarters */}
-                        <motion.div
-                            initial={{ opacity: 0, y: 30 }}
-                            whileInView={{ opacity: 1, y: 0 }}
-                            viewport={{ once: true }}
-                            whileHover={{ x: 10 }}
-                            transition={{ duration: 0.3 }}
+                        <motion.h2
+                            className="text-2xl font-bold mb-6 text-white border-l-4 border-primary pl-4"
+                            whileHover={{ borderColor: "rgba(139, 92, 246, 1)" }}
                         >
-                            <motion.h2
-                                className="text-2xl font-bold mb-6 text-white border-l-4 border-primary pl-4"
-                                whileHover={{ borderColor: "rgba(139, 92, 246, 1)" }}
-                            >
-                                Headquarters
-                            </motion.h2>
-                            <p className="text-gray-400 leading-relaxed mb-4">
-                                CLUB369 operates globally with decentralized hubs. Our primary concierge center is available for verified members and prospective applicants.
-                            </p>
-                            <motion.div
-                                className="flex items-start gap-4 text-gray-300"
-                                whileHover={{ x: 5 }}
-                            >
-                                <motion.span
-                                    className="material-symbols-outlined text-primary mt-1"
-                                    animate={{
-                                        y: [0, -5, 0],
-                                    }}
-                                    transition={{
-                                        duration: 2,
-                                        repeat: Infinity,
-                                    }}
-                                >
-                                    location_on
-                                </motion.span>
-                                <span>
-                                    One World Trade Center<br />
-                                    Suite 8500, New York<br />
-                                    NY 10007, USA
-                                </span>
-                            </motion.div>
-                        </motion.div>
-
-                        {/* Direct Lines */}
+                            Headquarters
+                        </motion.h2>
+                        <p className="text-gray-400 leading-relaxed mb-4">
+                            CLUB369 operates globally with decentralized hubs. Our primary concierge center is available for verified members and prospective applicants.
+                        </p>
                         <motion.div
-                            initial={{ opacity: 0, y: 30 }}
-                            whileInView={{ opacity: 1, y: 0 }}
-                            viewport={{ once: true }}
-                            transition={{ delay: 0.2 }}
+                            className="flex items-start gap-4 text-gray-300"
+                            whileHover={{ x: 5 }}
                         >
-                            <h2 className="text-2xl font-bold mb-6 text-white border-l-4 border-primary pl-4">Direct Lines</h2>
-                            <div className="space-y-4">
-                                {[
-                                    { icon: 'mail', label: 'Membership Inquiries', value: 'concierge@club369.com' },
-                                    { icon: 'call', label: 'Priority Support', value: '+1 (888) 369-CLUB' }
-                                ].map((item, i) => (
-                                    <motion.div
-                                        key={i}
-                                        className="flex items-center gap-4 text-gray-300 group cursor-pointer"
-                                        initial={{ opacity: 0, x: -20 }}
-                                        whileInView={{ opacity: 1, x: 0 }}
-                                        viewport={{ once: true }}
-                                        transition={{ delay: i * 0.1 }}
-                                        whileHover={{ x: 10, scale: 1.02 }}
-                                    >
-                                        <motion.div
-                                            className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors"
-                                            whileHover={{ rotate: 360 }}
-                                            transition={{ duration: 0.5 }}
-                                        >
-                                            <span className="material-symbols-outlined">{item.icon}</span>
-                                        </motion.div>
-                                        <div>
-                                            <div className="text-xs text-gray-500 uppercase font-bold">{item.label}</div>
-                                            <div className="text-white group-hover:text-primary transition-colors">{item.value}</div>
-                                        </div>
-                                    </motion.div>
-                                ))}
-                            </div>
-                        </motion.div>
-
-                        {/* Waitlist Status */}
-                        <motion.div
-                            className="p-8 bg-gradient-to-br from-[#161118] to-black border border-white/10 rounded-2xl relative overflow-hidden"
-                            initial={{ opacity: 0, y: 30 }}
-                            whileInView={{ opacity: 1, y: 0 }}
-                            viewport={{ once: true }}
-                            transition={{ delay: 0.3 }}
-                            whileHover={{ scale: 1.02, borderColor: "rgba(139, 92, 246, 0.5)" }}
-                        >
-                            {/* Animated background glow */}
-                            <motion.div
-                                className="absolute top-0 right-0 w-40 h-40 bg-primary/20 rounded-full blur-3xl"
+                            <motion.span
+                                className="material-symbols-outlined text-primary mt-1"
                                 animate={{
-                                    scale: [1, 1.3, 1],
-                                    opacity: [0.3, 0.6, 0.3],
+                                    y: [0, -5, 0],
                                 }}
                                 transition={{
-                                    duration: 3,
+                                    duration: 2,
                                     repeat: Infinity,
                                 }}
-                            />
-
-                            <h3 className="text-xl font-bold mb-2 relative z-10">Waitlist Status</h3>
-                            <p className="text-gray-400 text-sm mb-4 relative z-10">Current verification time for new applicants.</p>
-                            <div className="flex items-center gap-2 text-accent-green font-mono text-sm relative z-10">
-                                <span className="relative flex h-3 w-3">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent-green opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-3 w-3 bg-accent-green"></span>
-                                </span>
-                                48 - 72 Hours
-                            </div>
+                            >
+                                location_on
+                            </motion.span>
+                            <span>
+                                One World Trade Center<br />
+                                Suite 8500, New York<br />
+                                NY 10007, USA
+                            </span>
                         </motion.div>
                     </motion.div>
 
-                    {/* Contact Form with 3D Effects */}
+                    {/* Direct Lines */}
                     <motion.div
-                        initial={{ opacity: 0, x: 50 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.3 }}
-                        className="bg-[#161118] border border-white/10 p-8 md:p-10 rounded-3xl shadow-2xl relative overflow-hidden"
-                        whileHover={{ scale: 1.01 }}
-                        style={{ transformStyle: "preserve-3d" }}
+                        initial={{ opacity: 0, y: 30 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
+                        transition={{ delay: 0.2 }}
                     >
-                        {/* Animated background elements */}
-                        <motion.div
-                            className="absolute top-0 right-0 w-60 h-60 bg-primary/10 rounded-full blur-3xl"
-                            animate={{
-                                x: [0, 30, 0],
-                                y: [0, 20, 0],
-                                scale: [1, 1.2, 1],
-                            }}
-                            transition={{
-                                duration: 8,
-                                repeat: Infinity,
-                                ease: "easeInOut",
-                            }}
-                        />
-                        <motion.div
-                            className="absolute bottom-0 left-0 w-60 h-60 bg-blue-900/10 rounded-full blur-3xl"
-                            animate={{
-                                x: [0, -30, 0],
-                                y: [0, -20, 0],
-                                scale: [1, 1.2, 1],
-                            }}
-                            transition={{
-                                duration: 10,
-                                repeat: Infinity,
-                                ease: "easeInOut",
-                            }}
-                        />
-
-                        {/* Success State */}
-                        {submitted ? (
-                            <motion.div
-                                className="absolute inset-0 z-20 bg-[#161118] flex flex-col items-center justify-center text-center p-10"
-                                initial={{ opacity: 0, scale: 0.9 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                transition={{ duration: 0.5 }}
-                            >
+                        <h2 className="text-2xl font-bold mb-6 text-white border-l-4 border-primary pl-4">Direct Lines</h2>
+                        <div className="space-y-4">
+                            {[
+                                { icon: 'mail', label: 'Membership Inquiries', value: 'concierge@club369.com' },
+                                { icon: 'call', label: 'Priority Support', value: '+1 (888) 369-CLUB' }
+                            ].map((item, i) => (
                                 <motion.div
-                                    initial={{ scale: 0, rotate: -180 }}
-                                    animate={{ scale: 1, rotate: 0 }}
-                                    transition={{ type: "spring", stiffness: 200, damping: 15 }}
-                                    className="w-20 h-20 bg-primary/20 rounded-full flex items-center justify-center text-primary mb-6 relative"
+                                    key={i}
+                                    className="flex items-center gap-4 text-gray-300 group cursor-pointer"
+                                    initial={{ opacity: 0, x: -20 }}
+                                    whileInView={{ opacity: 1, x: 0 }}
+                                    viewport={{ once: true }}
+                                    transition={{ delay: i * 0.1 }}
+                                    whileHover={{ x: 10, scale: 1.02 }}
                                 >
                                     <motion.div
-                                        className="absolute inset-0 bg-primary/20 rounded-full"
-                                        animate={{
-                                            scale: [1, 1.5, 1],
-                                            opacity: [0.5, 0, 0.5],
-                                        }}
-                                        transition={{
-                                            duration: 2,
-                                            repeat: Infinity,
-                                        }}
-                                    />
-                                    <span className="material-symbols-outlined text-4xl relative z-10">check</span>
-                                </motion.div>
-                                <motion.h3
-                                    className="text-2xl font-bold text-white mb-2"
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: 0.3 }}
-                                >
-                                    Message Received
-                                </motion.h3>
-                                <motion.p
-                                    className="text-gray-400"
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: 0.5 }}
-                                >
-                                    Our concierge team will review your inquiry and respond within 24 hours.
-                                </motion.p>
-                                <motion.button
-                                    onClick={() => setSubmitted(false)}
-                                    className="mt-8 text-sm text-primary hover:text-white font-bold uppercase tracking-widest"
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    transition={{ delay: 0.7 }}
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
-                                >
-                                    Send Another Message
-                                </motion.button>
-                            </motion.div>
-                        ) : null}
-
-                        <h3 className="text-2xl font-bold text-white mb-6 relative z-10">Send a Message</h3>
-                        <form onSubmit={handleSubmit} className="flex flex-col gap-6 relative z-10">
-                            <div className="grid grid-cols-2 gap-6">
-                                {[
-                                    { label: 'Full Name', type: 'text', key: 'name' },
-                                    { label: 'Email Address', type: 'email', key: 'email' }
-                                ].map((field, i) => (
-                                    <motion.div
-                                        key={field.key}
-                                        className="space-y-2"
-                                        initial={{ opacity: 0, y: 20 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ delay: 0.4 + i * 0.1 }}
+                                        className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors"
+                                        whileHover={{ rotate: 360 }}
+                                        transition={{ duration: 0.5 }}
                                     >
-                                        <label className="text-xs font-bold text-gray-500 uppercase ml-1">{field.label}</label>
-                                        <motion.input
-                                            type={field.type}
-                                            value={formState[field.key as keyof typeof formState]}
-                                            onChange={(e) => setFormState({ ...formState, [field.key]: e.target.value })}
-                                            className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
-                                            required
-                                            whileFocus={{ scale: 1.02 }}
-                                            transition={{ duration: 0.2 }}
-                                        />
+                                        <span className="material-symbols-outlined">{item.icon}</span>
                                     </motion.div>
-                                ))}
-                            </div>
-
-                            <motion.div
-                                className="space-y-2"
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.6 }}
-                            >
-                                <label className="text-xs font-bold text-gray-500 uppercase ml-1">Subject</label>
-                                <motion.select
-                                    value={formState.subject}
-                                    onChange={(e) => setFormState({ ...formState, subject: e.target.value })}
-                                    className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
-                                    whileFocus={{ scale: 1.02 }}
-                                >
-                                    <option>Membership Inquiry</option>
-                                    <option>Partnership Proposal</option>
-                                    <option>Event Hosting</option>
-                                    <option>Technical Support</option>
-                                    <option>Other</option>
-                                </motion.select>
-                            </motion.div>
-
-                            <motion.div
-                                className="space-y-2"
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.7 }}
-                            >
-                                <label className="text-xs font-bold text-gray-500 uppercase ml-1">Message</label>
-                                <motion.textarea
-                                    rows={4}
-                                    value={formState.message}
-                                    onChange={(e) => setFormState({ ...formState, message: e.target.value })}
-                                    className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all resize-none"
-                                    required
-                                    whileFocus={{ scale: 1.02 }}
-                                />
-                            </motion.div>
-
-                            <motion.button
-                                type="submit"
-                                disabled={isSubmitting}
-                                className="mt-2 w-full bg-white text-black hover:bg-primary hover:text-white font-bold tracking-widest uppercase rounded-xl py-4 transition-all shadow-lg flex items-center justify-center gap-2 relative overflow-hidden"
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.8 }}
-                                whileHover={{ scale: 1.02, y: -2 }}
-                                whileTap={{ scale: 0.98 }}
-                            >
-                                {/* Animated shine effect */}
-                                <motion.div
-                                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-                                    initial={{ x: "-100%" }}
-                                    whileHover={{ x: "100%" }}
-                                    transition={{ duration: 0.6 }}
-                                />
-                                <span className="relative z-10">
-                                    {isSubmitting ? 'Sending...' : 'Transmit Message'}
-                                </span>
-                            </motion.button>
-                        </form>
+                                    <div>
+                                        <div className="text-xs text-gray-500 uppercase font-bold">{item.label}</div>
+                                        <div className="text-white group-hover:text-primary transition-colors">{item.value}</div>
+                                    </div>
+                                </motion.div>
+                            ))}
+                        </div>
                     </motion.div>
-                </div>
+
+                    {/* Waitlist Status */}
+                    <motion.div
+                        className="p-8 bg-gradient-to-br from-[#161118] to-black border border-white/10 rounded-2xl relative overflow-hidden"
+                        initial={{ opacity: 0, y: 30 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
+                        transition={{ delay: 0.3 }}
+                        whileHover={{ scale: 1.02, borderColor: "rgba(139, 92, 246, 0.5)" }}
+                    >
+                        {/* Animated background glow */}
+                        <motion.div
+                            className="absolute top-0 right-0 w-40 h-40 bg-primary/20 rounded-full blur-3xl"
+                            animate={{
+                                scale: [1, 1.3, 1],
+                                opacity: [0.3, 0.6, 0.3],
+                            }}
+                            transition={{
+                                duration: 3,
+                                repeat: Infinity,
+                            }}
+                        />
+
+                        <h3 className="text-xl font-bold mb-2 relative z-10">Waitlist Status</h3>
+                        <p className="text-gray-400 text-sm mb-4 relative z-10">Current verification time for new applicants.</p>
+                        <div className="flex items-center gap-2 text-accent-green font-mono text-sm relative z-10">
+                            <span className="relative flex h-3 w-3">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent-green opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-3 w-3 bg-accent-green"></span>
+                            </span>
+                            48 - 72 Hours
+                        </div>
+                    </motion.div>
+                </motion.div>
+
             </main>
 
             <Footer />

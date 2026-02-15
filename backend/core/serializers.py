@@ -19,15 +19,24 @@ class Base64ImageField(serializers.ImageField):
 class UserSerializer(serializers.ModelSerializer):
     name = serializers.CharField(source='full_name')
     mobile = serializers.CharField(source='phone')
-    profile_picture = Base64ImageField(source='profile_image', required=False, allow_null=True)
+    profile_picture = serializers.SerializerMethodField()
+    profile_pic = serializers.URLField(read_only=True)
+    profile_pic_public_id = serializers.CharField(read_only=True)
     membership_status = serializers.SerializerMethodField()
     last_payment_date = serializers.SerializerMethodField()
     membership_end_date = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ('id', 'name', 'email', 'mobile', 'profile_picture', 'role', 'status', 'created_at', 'membership_status', 'last_payment_date', 'membership_end_date')
+        fields = ('id', 'name', 'email', 'mobile', 'profile_picture', 'profile_pic', 'profile_pic_public_id', 'role', 'status', 'created_at', 'membership_status', 'last_payment_date', 'membership_end_date')
         read_only_fields = ('id', 'email', 'role', 'status', 'created_at')
+
+    def get_profile_picture(self, obj):
+        if obj.profile_pic:
+            return obj.profile_pic
+        if obj.profile_image:
+            return obj.profile_image.url
+        return None
 
     def get_membership_status(self, obj):
         membership = obj.memberships.filter(status='ACTIVE').order_by('-end_date').first()
