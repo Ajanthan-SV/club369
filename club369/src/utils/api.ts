@@ -9,16 +9,15 @@ interface StandardizedResponse<T> {
 }
 
 const instance = axios.create({
-    baseURL: '/api',
+    baseURL: (import.meta.env.VITE_API_BASE_URL || '') + '/api',
     withCredentials: true,
     headers: {
         'Content-Type': 'application/json',
     }
 });
 
-// Request Interceptor for debugging
+// Request Interceptor
 instance.interceptors.request.use(config => {
-    console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`);
     return config;
 });
 

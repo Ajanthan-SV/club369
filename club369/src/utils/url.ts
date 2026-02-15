@@ -10,5 +10,6 @@ export const getFullUrl = (path: string | null | undefined): string | null => {
     }
 
     const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-    return normalizedPath;
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
+    return `${baseUrl}${normalizedPath}`;
 };
