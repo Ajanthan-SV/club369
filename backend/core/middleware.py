@@ -29,7 +29,7 @@ class JWTCookieMiddleware(MiddlewareMixin):
                 response.set_cookie(
                     key=settings.SIMPLE_JWT['AUTH_COOKIE'],
                     value=access_token,
-                    expires=settings.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME'],
+                    max_age=settings.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME'].total_seconds(),
                     httponly=settings.SIMPLE_JWT['AUTH_COOKIE_HTTP_ONLY'],
                     secure=settings.SIMPLE_JWT.get('AUTH_COOKIE_SECURE', False),
                     samesite=settings.SIMPLE_JWT['AUTH_COOKIE_SAMESITE'],
@@ -40,7 +40,7 @@ class JWTCookieMiddleware(MiddlewareMixin):
                 response.set_cookie(
                     key=settings.SIMPLE_JWT['AUTH_COOKIE_REFRESH'],
                     value=refresh_token,
-                    expires=settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'],
+                    max_age=settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'].total_seconds(),
                     httponly=settings.SIMPLE_JWT['AUTH_COOKIE_HTTP_ONLY'],
                     secure=settings.SIMPLE_JWT.get('AUTH_COOKIE_SECURE', False),
                     samesite=settings.SIMPLE_JWT['AUTH_COOKIE_SAMESITE'],

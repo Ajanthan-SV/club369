@@ -16,6 +16,12 @@ const instance = axios.create({
     }
 });
 
+// Request Interceptor for debugging
+instance.interceptors.request.use(config => {
+    console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`);
+    return config;
+});
+
 // Response Interceptor to unwrap successful data
 instance.interceptors.response.use(
     (response: AxiosResponse<StandardizedResponse<any>>): any => {
@@ -28,6 +34,24 @@ instance.interceptors.response.use(
         }
     },
     (error) => {
+        const originalRequest = error.config;
+
+        // If error is 401 and we haven't tried refreshing yet
+        if (error.response?.status === 401 && !originalRequest._retry) {
+            originalRequest._retry = true;
+
+            return axios.post('/api/auth/refresh/', {}, { withCredentials: true })
+                .then(() => {
+                    // Successfully refreshed, retry the original request
+                    return instance(originalRequest);
+                })
+                .catch((refreshError) => {
+                    // Refresh token itself expired, logout the user
+                    window.location.href = '/#/login';
+                    return Promise.reject(refreshError);
+                });
+        }
+
         if (error.response?.data) {
             const { message, errors } = error.response.data as StandardizedResponse<any>;
             return Promise.reject({
@@ -45,6 +69,7 @@ export interface ApiClient extends AxiosInstance {
     get<T = any, R = T, D = any>(url: string, config?: any): Promise<R>;
     post<T = any, R = T, D = any>(url: string, data?: D, config?: any): Promise<R>;
     put<T = any, R = T, D = any>(url: string, data?: D, config?: any): Promise<R>;
+    patch<T = any, R = T, D = any>(url: string, data?: D, config?: any): Promise<R>;
     delete<T = any, R = T, D = any>(url: string, config?: any): Promise<R>;
 }
 

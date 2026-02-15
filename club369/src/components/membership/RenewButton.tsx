@@ -19,13 +19,13 @@ const RenewButton: React.FC<RenewButtonProps> = ({ status, expiryDate, amount, e
     const canRenew = () => {
         if (status === 'EXPIRED' || status === 'expired' || status === 'NONE') return true;
 
-        // If active, allow renewal if within 15 days of expiry
+        // If active, allow renewal if within 5 days of expiry
         const expiry = new Date(expiryDate);
         const today = new Date();
         const diffTime = expiry.getTime() - today.getTime();
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-        return diffDays <= 15;
+        return diffDays <= 5;
     };
 
     const handlePayment = async () => {
@@ -65,7 +65,7 @@ const RenewButton: React.FC<RenewButtonProps> = ({ status, expiryDate, amount, e
                     Renew Locked
                 </button>
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 p-2 bg-black border border-white/10 rounded-lg text-[10px] text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-                    Renewal opens 15 days before expiry
+                    Renewal opens 5 days before expiry
                 </div>
             </div>
         );

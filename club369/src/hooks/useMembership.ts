@@ -32,17 +32,19 @@ export const useMembership = () => {
 
     const isRenewalAllowed = () => {
         if (!details) return false;
+        if (details.status === 'expired' || details.status === 'none') return true;
+
         const expiry = new Date(details.expiryDate);
         const today = new Date();
-        const diffTime = Math.abs(expiry.getTime() - today.getTime());
+        const diffTime = expiry.getTime() - today.getTime();
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         return diffDays <= 5;
     };
 
     const claimVoucher = async (voucherId: string) => {
         try {
-            await MembershipService.claimVoucher(voucherId);
-            setVouchers(prev => prev.map(v => v.id === voucherId ? { ...v, isClaimed: true } : v));
+            const updatedVoucher = await MembershipService.claimVoucher(voucherId);
+            setVouchers(prev => prev.map(v => v.id === voucherId ? updatedVoucher : v));
         } catch (err) {
             setError('Failed to claim voucher');
             throw err;

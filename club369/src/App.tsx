@@ -7,7 +7,7 @@ import FixedBackground from './components/layout/FixedBackground';
 import Home from './pages/public/Home';
 import About from './pages/public/About';
 import Login from './pages/public/Login';
-import AdminLogin from './pages/public/AdminLogin';
+
 import Dashboard from './pages/dashboard/Dashboard';
 import Admin from './pages/admin/Admin';
 import Checkout from './pages/public/Checkout';
@@ -39,6 +39,7 @@ const ProtectedRoute = ({ children, role }: { children: React.ReactNode; role?: 
   }
 
   if (role && user?.role?.toLowerCase() !== role.toLowerCase()) {
+    console.log('Blocked by ProtectedRoute:', { userRole: user?.role, requiredRole: role });
     return <Navigate to="/" replace />;
   }
 
@@ -70,7 +71,7 @@ const AppRoutes = () => {
           <Route path="/contact" element={<Contact />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route path="/admin/login" element={<AdminLogin />} />
+
 
           {/* User Flow Routes */}
           <Route path="/payment" element={<Checkout />} />

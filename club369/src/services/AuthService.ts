@@ -12,7 +12,6 @@ export const AuthService = {
         try {
             await api.post('/auth/logout/');
         } finally {
-            localStorage.removeItem('token');
             localStorage.removeItem('user');
         }
     },
@@ -29,6 +28,12 @@ export const AuthService = {
 
     getMe: async (): Promise<User> => {
         const user = await api.get<User>('/auth/me/');
+        localStorage.setItem('user', JSON.stringify(user));
+        return user;
+    },
+
+    updateProfile: async (data: Partial<User>): Promise<User> => {
+        const user = await api.patch<any, User>('/auth/me/', data);
         localStorage.setItem('user', JSON.stringify(user));
         return user;
     }

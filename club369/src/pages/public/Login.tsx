@@ -407,6 +407,16 @@ const Login: React.FC = () => {
                 >
                   • member@club369.com
                 </motion.span>
+                <div className="col-span-2">
+                  <motion.span
+                    onClick={() => setEmail('admin@club369.com')}
+                    className="cursor-pointer hover:text-white transition-colors block text-center"
+                    whileHover={{ x: 5, color: "#ffffff" }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    • admin@club369.com (Admin)
+                  </motion.span>
+                </div>
               </div>
             </motion.div>
 
@@ -470,15 +480,6 @@ const Login: React.FC = () => {
                 Back to Home
               </Link>
             </motion.div>
-
-            <motion.div whileHover={{ scale: 1.05 }}>
-              <Link
-                to="/admin/login"
-                className="text-[10px] text-gray-600 hover:text-primary transition-colors uppercase tracking-widest inline-block"
-              >
-                Admin Portal
-              </Link>
-            </motion.div>
           </motion.div>
 
           {/* Corner decorations */}
@@ -497,42 +498,44 @@ const Login: React.FC = () => {
         </motion.div>
 
         {/* Floating "369" numbers around the card */}
-        {[
-          { num: '3', delay: 0, x: -150, y: -100 },
-          { num: '6', delay: 0.3, x: 150, y: -50 },
-          { num: '9', delay: 0.6, x: 0, y: 120 },
-        ].map((item, i) => (
-          <motion.div
-            key={i}
-            className="absolute text-[120px] font-bold text-primary/5 pointer-events-none select-none"
-            initial={{ opacity: 0, scale: 0, rotate: -180 }}
-            animate={{
-              opacity: 1,
-              scale: 1,
-              rotate: 0,
-              y: [0, -20, 0],
-            }}
-            transition={{
-              opacity: { delay: item.delay, duration: 0.8 },
-              scale: { delay: item.delay, duration: 0.8 },
-              rotate: { delay: item.delay, duration: 0.8 },
-              y: {
-                duration: 3,
-                repeat: Infinity,
-                delay: item.delay + 1,
-              },
-            }}
-            style={{
-              left: `calc(50% + ${item.x}px)`,
-              top: `calc(50% + ${item.y}px)`,
-              transform: 'translate(-50%, -50%)',
-            }}
-          >
-            {item.num}
-          </motion.div>
-        ))}
-      </div>
-    </div>
+        {
+          [
+            { num: '3', delay: 0, x: -150, y: -100 },
+            { num: '6', delay: 0.3, x: 150, y: -50 },
+            { num: '9', delay: 0.6, x: 0, y: 120 },
+          ].map((item, i) => (
+            <motion.div
+              key={i}
+              className="absolute text-[120px] font-bold text-primary/5 pointer-events-none select-none"
+              initial={{ opacity: 0, scale: 0, rotate: -180 }}
+              animate={{
+                opacity: 1,
+                scale: 1,
+                rotate: 0,
+                y: [0, -20, 0],
+              }}
+              transition={{
+                opacity: { delay: item.delay, duration: 0.8 },
+                scale: { delay: item.delay, duration: 0.8 },
+                rotate: { delay: item.delay, duration: 0.8 },
+                y: {
+                  duration: 3,
+                  repeat: Infinity,
+                  delay: item.delay + 1,
+                },
+              }}
+              style={{
+                left: `calc(50% + ${item.x}px)`,
+                top: `calc(50% + ${item.y}px)`,
+                transform: 'translate(-50%, -50%)',
+              }}
+            >
+              {item.num}
+            </motion.div>
+          ))
+        }
+      </div >
+    </div >
   );
 };
 

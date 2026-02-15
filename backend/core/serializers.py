@@ -22,14 +22,12 @@ class UserSerializer(serializers.ModelSerializer):
     profile_picture = Base64ImageField(source='profile_image', required=False, allow_null=True)
     membership_status = serializers.SerializerMethodField()
     last_payment_date = serializers.SerializerMethodField()
+    membership_end_date = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ('id', 'name', 'email', 'mobile', 'profile_picture', 'role', 'status', 'created_at', 'membership_status', 'last_payment_date')
+        fields = ('id', 'name', 'email', 'mobile', 'profile_picture', 'role', 'status', 'created_at', 'membership_status', 'last_payment_date', 'membership_end_date')
         read_only_fields = ('id', 'email', 'role', 'status', 'created_at')
-
-    def get_profile_picture(self, obj):
-        return obj.profile_image.url if obj.profile_image else None
 
     def get_membership_status(self, obj):
         membership = obj.memberships.filter(status='ACTIVE').order_by('-end_date').first()
@@ -38,6 +36,13 @@ class UserSerializer(serializers.ModelSerializer):
     def get_last_payment_date(self, obj):
         last_payment = obj.payments.filter(payment_status='SUCCESS').order_by('-paid_at').first()
         return last_payment.paid_at.isoformat() if last_payment and last_payment.paid_at else None
+
+    def get_membership_end_date(self, obj):
+        membership = obj.memberships.filter(status='ACTIVE').order_by('-end_date').first()
+        if not membership:
+            # Fallback to expired if no active exists
+            membership = obj.memberships.all().order_by('-end_date').first()
+        return membership.end_date.isoformat() if membership else None
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -92,10 +97,12 @@ class TransactionLedgerSerializer(serializers.ModelSerializer):
     date = serializers.DateTimeField(source='transaction_date')
     method = serializers.SerializerMethodField()
     status = serializers.SerializerMethodField()
+    user_name = serializers.CharField(source='user.full_name', read_only=True)
+    
 
     class Meta:
         model = TransactionLedger
-        fields = ('id', 'user', 'date', 'amount', 'status', 'method')
+        fields = ('id', 'user', 'user_name', 'date', 'amount', 'status', 'method')
 
     def get_method(self, obj):
         return obj.payment.payment_mode if obj.payment else 'Unknown'
@@ -106,16 +113,24 @@ class TransactionLedgerSerializer(serializers.ModelSerializer):
 class VoucherSerializer(serializers.ModelSerializer):
     title = serializers.CharField(source='voucher_name')
     isClaimed = serializers.SerializerMethodField()
+    code = serializers.SerializerMethodField()
 
     class Meta:
         model = Voucher
-        fields = ('id', 'title', 'description', 'isClaimed')
+        fields = ('id', 'title', 'description', 'isClaimed', 'code')
 
     def get_isClaimed(self, obj):
         user = self.context.get('request').user if 'request' in self.context else None
         if user and user.is_authenticated:
             return UserVoucher.objects.filter(user=user, voucher=obj).exists()
         return False
+
+    def get_code(self, obj):
+        user = self.context.get('request').user if 'request' in self.context else None
+        if user and user.is_authenticated:
+            if UserVoucher.objects.filter(user=user, voucher=obj).exists():
+                return obj.voucher_code
+        return "********"
 
 class UserVoucherSerializer(serializers.ModelSerializer):
     voucher_details = VoucherSerializer(source='voucher', read_only=True)
@@ -128,4 +143,26 @@ class AdminActivityLogSerializer(serializers.ModelSerializer):
     class Meta:
         model = AdminActivityLog
         fields = '__all__'
+
+
+class AdminVoucherSerializer(serializers.ModelSerializer):
+    title = serializers.CharField(source='voucher_name')
+    usageCount = serializers.SerializerMethodField()
+    usedBy = serializers.SerializerMethodField()
+    expiryDate = serializers.DateTimeField(source='valid_until')
+    code = serializers.CharField(source='voucher_code')
+    isSuspended = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Voucher
+        fields = ('id', 'title', 'code', 'description', 'max_usage_per_user', 'valid_from', 'expiryDate', 'isSuspended', 'usageCount', 'usedBy')
+
+    def get_usageCount(self, obj):
+        return obj.user_vouchers.count()
+
+    def get_usedBy(self, obj):
+        return [uv.user.full_name for uv in obj.user_vouchers.all()]
+
+    def get_isSuspended(self, obj):
+        return not obj.is_active
 

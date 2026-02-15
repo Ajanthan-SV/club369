@@ -1,9 +1,11 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
+import { getFullUrl } from '../../utils/url';
+import { formatDate } from '../../utils/date';
 
 const Profile: React.FC = () => {
-    const { user, register } = useAuth(); // Using register as update for now if no update method, or I should add updateProfile
+    const { user, updateProfile } = useAuth();
     const [isEditing, setIsEditing] = useState(false);
     const [formData, setFormData] = useState({
         name: user?.name || '',
@@ -29,13 +31,21 @@ const Profile: React.FC = () => {
     const handleSave = async () => {
         setSaveLoading(true);
         try {
-            // Simulate API update
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            // In a real app, we'd call an updateProfile service
-            // For now, let's assume update logic would refresh context
+            const updateData: any = {
+                name: formData.name,
+                mobile: formData.mobile,
+            };
+
+            if (profilePic && profilePic.startsWith('data:image')) {
+                updateData.profile_picture = profilePic;
+            }
+
+            await updateProfile(updateData);
+
             alert('Profile updated successfully!');
             setIsEditing(false);
         } catch (err) {
+            console.error("Save error:", err);
             alert('Failed to update profile.');
         } finally {
             setSaveLoading(false);
@@ -55,7 +65,7 @@ const Profile: React.FC = () => {
                     <div className="relative group">
                         <div className="w-32 h-32 rounded-full border-4 border-primary/20 overflow-hidden bg-primary/10 flex items-center justify-center">
                             {profilePic ? (
-                                <img src={profilePic} alt={user.name} className="w-full h-full object-cover" />
+                                <img src={getFullUrl(profilePic) || ''} alt={user.name} className="w-full h-full object-cover" />
                             ) : (
                                 <span className="material-symbols-outlined text-6xl text-primary/40">person</span>
                             )}
@@ -85,9 +95,11 @@ const Profile: React.FC = () => {
                             <span className="px-3 py-1 bg-primary/20 text-primary text-[10px] font-bold border border-primary/30 rounded-full uppercase tracking-tighter">
                                 {user.role}
                             </span>
-                            <span className={`px-3 py-1 ${user.membership_status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'} text-[10px] font-bold border rounded-full uppercase tracking-tighter`}>
-                                {user.membership_status || 'NONE'}
-                            </span>
+                            {user.role?.toLowerCase() !== 'admin' && (
+                                <span className={`px-3 py-1 ${user.membership_status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'} text-[10px] font-bold border rounded-full uppercase tracking-tighter`}>
+                                    {user.membership_status || 'NONE'}
+                                </span>
+                            )}
                         </div>
                         <p className="text-gray-500 text-sm mb-4">Member ID: {user.id}</p>
 
@@ -182,7 +194,7 @@ const Profile: React.FC = () => {
 
                     <div className="space-y-1">
                         <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest ml-1">Account Created</label>
-                        <div className="p-3 bg-white/5 border border-white/5 rounded-xl text-gray-400 font-medium">{user.created_at || 'Jan 1, 2024'}</div>
+                        <div className="p-3 bg-white/5 border border-white/5 rounded-xl text-gray-400 font-medium">{formatDate(user.created_at)}</div>
                     </div>
                 </div>
             </motion.div>

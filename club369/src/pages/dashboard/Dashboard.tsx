@@ -7,6 +7,8 @@ import { useMembership } from '../../hooks/useMembership';
 import Profile from '../shared/Profile';
 import RenewButton from '../../components/membership/RenewButton';
 import VoucherCard from '../../components/vouchers/VoucherCard';
+import { getFullUrl } from '../../utils/url';
+import { formatDate } from '../../utils/date';
 
 // --- Sub-components for Dashboard Views ---
 
@@ -164,7 +166,7 @@ const TransactionLedger: React.FC<{ transactions: any[] }> = ({ transactions }) 
                     <tbody className="text-sm">
                         {transactions.map((txn) => (
                             <tr key={txn.id} className="border-t border-white/5 hover:bg-white/[0.02] transition-colors text-white">
-                                <td className="p-5 text-gray-400">{new Date(txn.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
+                                <td className="p-5 text-gray-400">{formatDate(txn.date)}</td>
                                 <td className="p-5 font-mono text-xs">{txn.id}</td>
                                 <td className="p-5 font-bold">₹ {txn.amount.toLocaleString()}</td>
                                 <td className="p-5 text-right">
@@ -231,7 +233,7 @@ const Dashboard: React.FC = () => {
                 <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-full border-2 border-primary/20 overflow-hidden bg-primary/10 flex items-center justify-center shrink-0">
                         {user?.profile_picture ? (
-                            <img src={user.profile_picture} alt={user.name} className="w-full h-full object-cover" />
+                            <img src={getFullUrl(user.profile_picture) || ''} alt={user.name} className="w-full h-full object-cover" />
                         ) : (
                             <span className="material-symbols-outlined text-2xl text-primary/40">person</span>
                         )}

@@ -14,8 +14,8 @@ export const MembershipService = {
         return await api.get<Transaction[]>('/membership/transactions/');
     },
 
-    claimVoucher: async (voucherId: string): Promise<void> => {
-        await api.post(`/vouchers/claim/${voucherId}/`);
+    claimVoucher: async (voucherId: string): Promise<Voucher> => {
+        return await api.post<Voucher>(`/vouchers/claim/${voucherId}/`);
     }
 };
 

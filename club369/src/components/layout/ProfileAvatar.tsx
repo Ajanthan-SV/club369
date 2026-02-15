@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
+import { getFullUrl } from '../../utils/url';
 
 const ProfileAvatar: React.FC = () => {
     const { user, logout } = useAuth();
@@ -39,7 +40,7 @@ const ProfileAvatar: React.FC = () => {
             >
                 <div className="w-8 h-8 rounded-full overflow-hidden bg-primary/20 flex items-center justify-center border border-white/5">
                     {user.profile_picture ? (
-                        <img src={user.profile_picture} alt={user.name} className="w-full h-full object-cover" />
+                        <img src={getFullUrl(user.profile_picture) || ''} alt={user.name} className="w-full h-full object-cover" />
                     ) : (
                         <span className="material-symbols-outlined text-[20px] text-primary">person</span>
                     )}

@@ -10,7 +10,7 @@ from .serializers import (
     UserSerializer, RegisterSerializer, 
     MembershipSerializer, PaymentSerializer, TransactionLedgerSerializer, 
     VoucherSerializer, UserVoucherSerializer, AdminActivityLogSerializer,
-    MembershipDetailSerializer
+    MembershipDetailSerializer, AdminVoucherSerializer
 )
 from django.conf import settings
 
@@ -97,8 +97,16 @@ class LogoutView(views.APIView):
 
         # 2. Cookie Deletion
         response = Response({'status': 'Logged out successfully'}, status=status.HTTP_200_OK)
-        response.delete_cookie(settings.SIMPLE_JWT['AUTH_COOKIE'])
-        response.delete_cookie(settings.SIMPLE_JWT['AUTH_COOKIE_REFRESH'])
+        
+        cookie_settings = {
+            'path': settings.SIMPLE_JWT.get('AUTH_COOKIE_PATH', '/'),
+            'domain': settings.SIMPLE_JWT.get('AUTH_COOKIE_DOMAIN'),
+            'samesite': settings.SIMPLE_JWT.get('AUTH_COOKIE_SAMESITE'),
+        }
+
+        response.delete_cookie(settings.SIMPLE_JWT['AUTH_COOKIE'], **cookie_settings)
+        response.delete_cookie(settings.SIMPLE_JWT['AUTH_COOKIE_REFRESH'], **cookie_settings)
+        
         return response
 
 class RegisterView(generics.CreateAPIView):
@@ -241,16 +249,19 @@ class ClaimVoucherView(views.APIView):
                 return Response({'error': 'Voucher already claimed'}, status=status.HTTP_400_BAD_REQUEST)
 
             UserVoucher.objects.create(user=request.user, voucher=voucher)
-            return Response({'status': 'Voucher claimed'})
+            serializer = VoucherSerializer(voucher, context={'request': request})
+            return Response(serializer.data)
         except Voucher.DoesNotExist:
             return Response({'error': 'Voucher not found'}, status=status.HTTP_404_NOT_FOUND)
 
 # --- Admin Dashboards ---
 
 class AdminUserListView(generics.ListAPIView):
-    queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = (permissions.IsAdminUser,)
+
+    def get_queryset(self):
+        return User.objects.exclude(is_superuser=True).exclude(is_staff=True).exclude(id=self.request.user.id)
 
 class AdminTransactionListView(generics.ListAPIView):
     queryset = TransactionLedger.objects.all()
@@ -280,3 +291,42 @@ class AdminCollectionsView(views.APIView):
         ).aggregate(models.Sum('amount'))['amount__sum'] or 0
         
         return Response({'total_last_30_days': total})
+
+class AdminVoucherListView(generics.ListAPIView):
+    queryset = Voucher.objects.all().order_by('-created_at')
+    serializer_class = AdminVoucherSerializer
+    permission_classes = (permissions.IsAdminUser,)
+
+class AdminVoucherCreateView(generics.CreateAPIView):
+    queryset = Voucher.objects.all()
+    serializer_class = AdminVoucherSerializer
+    permission_classes = (permissions.IsAdminUser,)
+
+    def perform_create(self, serializer):
+        # Default valid_from to now if not provided
+        if 'valid_from' not in serializer.validated_data:
+            serializer.save(valid_from=timezone.now())
+        else:
+            serializer.save()
+
+class AdminVoucherToggleView(views.APIView):
+    permission_classes = (permissions.IsAdminUser,)
+
+    def patch(self, request, pk):
+        try:
+            voucher = Voucher.objects.get(pk=pk)
+            voucher.is_active = not voucher.is_active
+            voucher.save()
+            return Response({'status': 'Voucher status updated', 'is_active': voucher.is_active})
+        except Voucher.DoesNotExist:
+            return Response({'error': 'Voucher not found'}, status=status.HTTP_404_NOT_FOUND)
+class AdminVoucherDeleteView(views.APIView):
+    permission_classes = (permissions.IsAdminUser,)
+
+    def delete(self, request, pk):
+        try:
+            voucher = Voucher.objects.get(pk=pk)
+            voucher.delete()
+            return Response({'status': 'Voucher deleted'})
+        except Voucher.DoesNotExist:
+            return Response({'error': 'Voucher not found'}, status=404)

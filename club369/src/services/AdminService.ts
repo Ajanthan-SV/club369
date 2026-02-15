@@ -19,6 +19,22 @@ export const AdminService = {
 
     getCollections: async (): Promise<{ total_last_30_days: number }> => {
         return await api.get<{ total_last_30_days: number }>('/admin/collections/');
+    },
+
+    getVouchers: async (): Promise<any[]> => {
+        return await api.get<any[]>('/admin/vouchers/');
+    },
+
+    createVoucher: async (data: any): Promise<any> => {
+        return await api.post('/admin/vouchers/create/', data);
+    },
+
+    toggleVoucherStatus: async (id: string): Promise<any> => {
+        return await api.patch(`/admin/vouchers/${id}/toggle/`);
+    },
+
+    deleteVoucher: async (id: string): Promise<any> => {
+        return await api.delete(`/admin/vouchers/${id}/delete/`);
     }
 };
 

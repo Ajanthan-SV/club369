@@ -4,8 +4,11 @@ import DashboardLayout from '../../components/layout/DashboardLayout';
 import Profile from '../shared/Profile';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
-import { AdminService, AdminMember as Member } from '../../services/AdminService';
+import { AdminService } from '../../services/AdminService';
+import { User as Member } from '../../types/auth';
 import { Transaction } from '../../types/membership';
+import { getFullUrl } from '../../utils/url';
+import { formatDate } from '../../utils/date';
 
 // Redundant interfaces removed, using imports from services/types
 
@@ -13,6 +16,7 @@ interface AdminVoucher {
     id: string;
     title: string;
     code: string;
+    description: string;
     limitPerUser: number;
     expiryDate: string;
     isSuspended: boolean;
@@ -29,6 +33,8 @@ const Admin: React.FC = () => {
     const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'failed' | 'inactive'>('all');
     const [selectedMember, setSelectedMember] = useState<Member | null>(null);
     const [showMemberModal, setShowMemberModal] = useState(false);
+    const [isPpHovered, setIsPpHovered] = useState(false);
+
 
     const [members, setMembers] = useState<Member[]>([]);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -40,20 +46,29 @@ const Admin: React.FC = () => {
     // Voucher Management States
     const [vouchers, setVouchers] = useState<AdminVoucher[]>([]);
     const [showVoucherForm, setShowVoucherForm] = useState(false);
-    const [newVoucher, setNewVoucher] = useState({ title: '', code: '', expiry: '' });
+    const [newVoucher, setNewVoucher] = useState({ title: '', code: '', expiry: '', description: '' });
     const [expandedVoucherId, setExpandedVoucherId] = useState<string | null>(null);
+    const [voucherSearch, setVoucherSearch] = useState('');
+    const [voucherStatusFilter, setVoucherStatusFilter] = useState<'all' | 'active' | 'suspended'>('all');
 
     useEffect(() => {
+        console.log('Admin Component Mounted');
         const fetchData = async () => {
+            console.log('Admin: Fetching data...');
             try {
-                const [membersRes, transactionsRes] = await Promise.all([
-                    AdminService.getMembers(),
-                    AdminService.getAllTransactions()
+                const [membersRes, transactionsRes, vouchersRes] = await Promise.all([
+                    AdminService.getUsers(),
+                    AdminService.getTransactions(),
+                    AdminService.getVouchers()
                 ]);
-                setMembers(membersRes);
-                setTransactions(transactionsRes);
-            } catch (err) {
-                console.error("Failed to fetch admin data", err);
+                console.log('Admin: Data fetched', { members: membersRes, transactions: transactionsRes, vouchers: vouchersRes });
+                setMembers(Array.isArray(membersRes) ? membersRes : []);
+                setTransactions(Array.isArray(transactionsRes) ? transactionsRes : []);
+                setVouchers(Array.isArray(vouchersRes) ? vouchersRes : []);
+            } catch (error) {
+                console.error("Failed to fetch admin data", error);
+                setMembers([]);
+                setTransactions([]);
             } finally {
                 setIsLoading(false);
             }
@@ -63,12 +78,12 @@ const Admin: React.FC = () => {
 
     // Calculate stats
     const stats = {
-        totalMembers: members.length,
-        activeMembers: members.filter(m => m.membership_status === 'ACTIVE').length,
-        expiredMembers: members.filter(m => m.membership_status === 'EXPIRED').length,
-        monthlyRevenue: transactions
+        totalMembers: (members || []).length,
+        activeMembers: (members || []).filter(m => m.membership_status === 'ACTIVE').length,
+        expiredMembers: (members || []).filter(m => m.membership_status === 'EXPIRED').length,
+        monthlyRevenue: (transactions || [])
             .filter(t => t.status === 'success' && new Date(t.date).getMonth() === new Date().getMonth())
-            .reduce((sum, t) => sum + t.amount, 0),
+            .reduce((sum, t) => sum + Number(t.amount || 0), 0),
     };
 
     // Filter and search logic
@@ -78,7 +93,7 @@ const Admin: React.FC = () => {
             member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
             member.phone?.toLowerCase().includes(searchTerm.toLowerCase());
 
-        const matchesFilter = filterStatus === 'all' || member.autopay === filterStatus;
+        const matchesFilter = filterStatus === 'all' || member.status === filterStatus;
 
         return matchesSearch && matchesFilter;
     });
@@ -106,30 +121,54 @@ const Admin: React.FC = () => {
     };
 
     // Voucher actions
-    const handleCreateVoucher = () => {
+    const handleCreateVoucher = async () => {
         if (!newVoucher.title || !newVoucher.code || !newVoucher.expiry) {
             alert('Please fill all fields');
             return;
         }
-        const voucher: AdminVoucher = {
-            id: Math.random().toString(36).substring(7).toUpperCase(),
-            title: newVoucher.title,
-            code: newVoucher.code.toUpperCase(),
-            limitPerUser: 1,
-            expiryDate: newVoucher.expiry,
-            isSuspended: false,
-            usageCount: 0,
-            usedBy: []
-        };
-        setVouchers(prev => [voucher, ...prev]);
-        setShowVoucherForm(false);
-        setNewVoucher({ title: '', code: '', expiry: '' });
+
+        try {
+            const voucherData = {
+                title: newVoucher.title,
+                code: newVoucher.code.toUpperCase(),
+                expiryDate: newVoucher.expiry,
+                description: newVoucher.description,
+                max_usage_per_user: 1,
+                valid_from: new Date().toISOString()
+            };
+
+            const createdVoucher = await AdminService.createVoucher(voucherData);
+            setVouchers(prev => [createdVoucher, ...prev]);
+            setShowVoucherForm(false);
+            setNewVoucher({ title: '', code: '', expiry: '', description: '' });
+        } catch (error) {
+            console.error("Failed to create voucher", error);
+            alert("Failed to create voucher");
+        }
     };
 
-    const toggleSuspendVoucher = (id: string) => {
-        setVouchers(prev => prev.map(v =>
-            v.id === id ? { ...v, isSuspended: !v.isSuspended } : v
-        ));
+    const toggleSuspendVoucher = async (id: string) => {
+        try {
+            const response = await AdminService.toggleVoucherStatus(id);
+            setVouchers(prev => prev.map(v =>
+                v.id === id ? { ...v, isSuspended: !response.is_active } : v
+            ));
+        } catch (error) {
+            console.error("Failed to toggle voucher status", error);
+            alert("Failed to toggle voucher status");
+        }
+    };
+
+    const handleDeleteVoucher = async (id: string) => {
+        if (window.confirm('Are you sure you want to delete this voucher?')) {
+            try {
+                await AdminService.deleteVoucher(id);
+                setVouchers(prev => prev.filter(v => v.id !== id));
+            } catch (error) {
+                console.error("Failed to delete voucher", error);
+                alert("Failed to delete voucher");
+            }
+        }
     };
 
     // const handleSendReminder = (memberId: number) => {
@@ -140,8 +179,8 @@ const Admin: React.FC = () => {
     // Export data
     const handleExportData = () => {
         const csvContent = [
-            ['Name', 'Email', 'Autopay Status', 'Next Billing', 'Phone', 'Joined Date'],
-            ...members.map(m => [m.name, m.email, m.autopay, m.nextBilling, m.phone || '', m.joinedDate])
+            ['Name', 'Email', 'Status', 'Last Payment', 'Phone', 'Created At'],
+            ...members.map(m => [m.name, m.email, m.status, formatDate(m.last_payment_date), m.mobile || '', formatDate(m.created_at)])
         ].map(row => row.join(',')).join('\n');
 
         const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -163,7 +202,7 @@ const Admin: React.FC = () => {
         <div className="bg-[#161118] border border-white/10 p-6 rounded-3xl flex items-center gap-6 mb-8">
             <div className="w-16 h-16 rounded-full border-2 border-primary/20 overflow-hidden bg-primary/10 flex items-center justify-center">
                 {user?.profile_picture ? (
-                    <img src={user.profile_picture} alt={user.name} className="w-full h-full object-cover" />
+                    <img src={getFullUrl(user.profile_picture) || ''} alt={user.name} className="w-full h-full object-cover" />
                 ) : (
                     <span className="material-symbols-outlined text-3xl text-primary/40">admin_panel_settings</span>
                 )}
@@ -187,19 +226,30 @@ const Admin: React.FC = () => {
             <div className="min-h-screen bg-gradient-to-br from-[#0a0a0a] to-[#1a0a1a] p-3 sm:p-4 md:p-6 lg:p-8">
                 <div className="max-w-7xl mx-auto flex flex-col gap-4 md:gap-6">
                     {/* Header */}
+
                     <motion.div
                         className="flex flex-col gap-4"
                         initial={{ opacity: 0, y: -20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.5 }}
                     >
+
                         {/* Title and Logout Row */}
                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                            <motion.div>
-                                <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight text-white uppercase italic">
-                                    Admin <span className="text-primary">Ops</span>
-                                </h1>
-                            </motion.div>
+                            <div className="flex items-center gap-2">
+                                <div className="w-12 h-12 rounded-full border-2 border-primary/20 overflow-hidden bg-primary/10 flex items-center justify-center shrink-0">
+                                    {user?.profile_picture ? (
+                                        <img src={getFullUrl(user.profile_picture) || ''} alt={user.name} className="w-full h-full object-cover" />
+                                    ) : (
+                                        <span className="material-symbols-outlined text-2xl text-primary/40">person</span>
+                                    )}
+                                </div>
+                                <motion.div>
+                                    <h2 className="text-3xl font-black tracking-tight text-white">
+                                        Hi, Admin <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-purple-400">{user?.name || 'Member'}.</span>
+                                    </h2>
+                                </motion.div>
+                            </div>
 
                             <div className="flex gap-2">
                                 <motion.button
@@ -238,7 +288,7 @@ const Admin: React.FC = () => {
                     </motion.div>
 
                     <AnimatePresence mode="wait">
-                        <Routes location={location}>
+                        <Routes>
                             <Route index element={
                                 <div className="space-y-6">
                                     {/* Stats Grid */}
@@ -247,7 +297,7 @@ const Admin: React.FC = () => {
                                             { title: 'Total Members', val: stats.totalMembers.toString(), icon: 'groups', color: 'text-blue-400', bg: 'from-blue-500/10' },
                                             { title: 'Active Members', val: stats.activeMembers.toString(), icon: 'check_circle', color: 'text-emerald-400', bg: 'from-emerald-500/10' },
                                             { title: 'Expired Members', val: stats.expiredMembers.toString(), icon: 'error', color: 'text-red-400', bg: 'from-red-500/10' },
-                                            { title: 'Monthly Revenue', val: `₹${(stats.monthlyRevenue / 100).toLocaleString()}`, icon: 'payments', color: 'text-primary', bg: 'from-purple-500/10' },
+                                            { title: 'Monthly Revenue', val: `₹${stats.monthlyRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, icon: 'payments', color: 'text-primary', bg: 'from-purple-500/10' },
                                         ].map((stat, i) => (
                                             <div key={i} className="bg-[#161118] border border-white/10 p-6 rounded-2xl relative overflow-hidden group">
                                                 <div className="relative z-10 flex justify-between items-start">
@@ -279,14 +329,18 @@ const Admin: React.FC = () => {
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-white/5">
-                                                    {transactions
+                                                    {(transactions || [])
                                                         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
                                                         .slice(0, 5)
                                                         .map(txn => (
                                                             <tr key={txn.id} className="hover:bg-white/5 transition-colors">
-                                                                <td className="px-6 py-4 text-xs text-gray-500">{txn.date}</td>
-                                                                <td className="px-6 py-4 font-bold text-white">{txn.user}</td>
-                                                                <td className="px-6 py-4 font-mono">₹{(txn.amount / 100).toLocaleString()}</td>
+                                                                <td className="px-6 py-4 text-xs text-gray-500">{formatDate(txn.date)}</td>
+                                                                <td className="px-6 py-4 font-bold text-white">
+                                                                    <div className="flex flex-col">
+                                                                        <span>{(txn as any).user_name || 'Unknown'}</span>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="px-6 py-4 font-mono">₹{Number(txn.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                                                 <td className="px-6 py-4 text-right">
                                                                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${txn.status === 'success' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
                                                                         {txn.status.toUpperCase()}
@@ -336,11 +390,12 @@ const Admin: React.FC = () => {
                                                             <div className="font-bold text-white">{member.name}</div>
                                                         </td>
                                                         <td className="px-6 py-4">
-                                                            <div>{member.email}</div>
-                                                            <div className="text-[10px]">{member.phone}</div>
+                                                            {/* <div>{member.email}</div> */}
+                                                            <div>{member.mobile}</div>
+                                                            {/* <div className="text-[10px]">{member.mobile || 'N/A'}</div> */}
                                                         </td>
                                                         <td className="px-6 py-4">
-                                                            <div className="text-white font-mono text-xs">{member.last_payment_date}</div>
+                                                            <div className="text-white font-mono text-xs">{formatDate(member.last_payment_date)}</div>
                                                         </td>
                                                         <td className="px-6 py-4">
                                                             <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${member.membership_status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'}`}>
@@ -380,20 +435,26 @@ const Admin: React.FC = () => {
                                                     className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white outline-none focus:border-primary"
                                                 />
                                             </div>
-                                            <div className="flex items-center gap-2">
-                                                <input
-                                                    type="date"
-                                                    value={dateRange.start}
-                                                    onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
-                                                    className="bg-black/20 border border-white/10 rounded-lg px-2 py-1 text-[10px] text-gray-400 outline-none focus:border-primary"
-                                                />
-                                                <span className="text-gray-600">to</span>
-                                                <input
-                                                    type="date"
-                                                    value={dateRange.end}
-                                                    onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
-                                                    className="bg-black/20 border border-white/10 rounded-lg px-2 py-1 text-[10px] text-gray-400 outline-none focus:border-primary"
-                                                />
+                                            <div className="flex items-center gap-1 bg-white/5 border border-white/10 rounded-lg px-2">
+                                                <div className="relative flex items-center">
+                                                    {/* <span className="material-symbols-outlined text-[14px] text-primary/40 mr-1.5 pointer-events-none">calendar_month</span> */}
+                                                    <input
+                                                        type="date"
+                                                        value={dateRange.start} mask="MM/DD/YYYY"
+                                                        onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+                                                        className="bg-transparent py-1.5 text-[10px] text-gray-300 outline-none focus:text-primary transition-colors [color-scheme:dark] w-24"
+                                                    />
+                                                </div>
+                                                <span className="text-[10px] font-bold text-gray-600 uppercase mx-1">to</span>
+                                                <div className="relative flex items-center">
+                                                    {/* <span className="material-symbols-outlined text-[14px] text-primary/40 mr-1.5 pointer-events-none">calendar_month</span> */}
+                                                    <input
+                                                        type="date"
+                                                        value={dateRange.end}
+                                                        onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+                                                        className="bg-transparent py-1.5 text-[10px] text-gray-300 outline-none focus:text-primary transition-colors [color-scheme:dark] w-24"
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -410,7 +471,8 @@ const Admin: React.FC = () => {
                                             <tbody className="divide-y divide-white/5">
                                                 {transactions
                                                     .filter(t => {
-                                                        const matchesUser = t.user.toLowerCase().includes(txnSearch.toLowerCase());
+                                                        const userName = typeof t.user === 'string' ? t.user : (t.user as any)?.name || '';
+                                                        const matchesUser = userName.toLowerCase().includes(txnSearch.toLowerCase());
                                                         const tDate = new Date(t.date).getTime();
                                                         const start = dateRange.start ? new Date(dateRange.start).getTime() : 0;
                                                         const end = dateRange.end ? new Date(dateRange.end).getTime() + (24 * 60 * 60 * 1000) : Infinity;
@@ -423,9 +485,13 @@ const Admin: React.FC = () => {
                                                     })
                                                     .map(txn => (
                                                         <tr key={txn.id} className="hover:bg-white/5 transition-colors">
-                                                            <td className="px-6 py-4 text-xs">{txn.date}</td>
-                                                            <td className="px-6 py-4 font-bold text-white">{txn.user}</td>
-                                                            <td className="px-6 py-4 font-mono">₹{(txn.amount / 100).toLocaleString()}</td>
+                                                            <td className="px-6 py-4 text-xs">{formatDate(txn.date)}</td>
+                                                            <td className="px-6 py-4 font-bold text-white">
+                                                                <div className="flex flex-col">
+                                                                    <span>{txn.user_name || 'Unknown'}</span>
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-6 py-4 font-mono">₹{Number(txn.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                                             <td className="px-6 py-4">
                                                                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${txn.status === 'success' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
                                                                     {txn.status.toUpperCase()}
@@ -442,17 +508,40 @@ const Admin: React.FC = () => {
                             <Route path="vouchers" element={
                                 <div className="space-y-6">
                                     <div className="bg-[#161118] border border-white/10 rounded-2xl p-6">
-                                        <div className="flex justify-between items-center mb-6">
+                                        <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
                                             <h3 className="text-xl font-bold text-white flex items-center gap-2">
                                                 <span className="material-symbols-outlined text-primary">confirmation_number</span>
                                                 Voucher Management
                                             </h3>
-                                            <button
-                                                onClick={() => setShowVoucherForm(!showVoucherForm)}
-                                                className="px-4 py-2 bg-primary text-white text-xs font-bold uppercase tracking-widest rounded-xl hover:bg-primary/80 transition-all"
-                                            >
-                                                {showVoucherForm ? 'Cancel' : 'Generate New Coupon'}
-                                            </button>
+                                            <div className="flex flex-wrap items-center gap-3">
+                                                <div className="relative group min-w-[200px]">
+                                                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm group-focus-within:text-primary transition-colors">search</span>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Search title/code..."
+                                                        value={voucherSearch}
+                                                        onChange={(e) => setVoucherSearch(e.target.value)}
+                                                        className="w-full bg-white/5 border border-white/10 rounded-xl pl-9 pr-4 py-2 text-xs text-white outline-none focus:border-primary/50 transition-all"
+                                                    />
+                                                </div>
+                                                <select
+                                                    value={voucherStatusFilter}
+                                                    onChange={(e) => setVoucherStatusFilter(e.target.value as any)}
+                                                    className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-gray-400 outline-none focus:border-primary/50 cursor-pointer transition-all pr-4"
+                                                >
+                                                    <option value="all">All Status</option>
+                                                    <option value="active">Active</option>
+                                                    <option value="suspended">Suspended</option>
+                                                    <option value="expired">Expired</option>
+                                                </select>
+                                                <button
+                                                    onClick={() => setShowVoucherForm(!showVoucherForm)}
+                                                    className="px-4 py-2 bg-primary text-white text-xs font-bold uppercase tracking-widest rounded-xl hover:bg-primary/80 transition-all flex items-center gap-2"
+                                                >
+                                                    <span className="material-symbols-outlined text-sm">{showVoucherForm ? 'close' : 'add'}</span>
+                                                    {showVoucherForm ? 'Cancel' : 'New Voucher'}
+                                                </button>
+                                            </div>
                                         </div>
 
                                         {showVoucherForm && (
@@ -465,9 +554,19 @@ const Admin: React.FC = () => {
                                                     <label className="text-[10px] font-bold text-gray-500 uppercase mb-1 block">Voucher Title</label>
                                                     <input
                                                         type="text"
-                                                        placeholder="e.g. Summer Special"
+                                                        placeholder="Voucher Title (e.g. Summer Discount)"
                                                         value={newVoucher.title}
                                                         onChange={(e) => setNewVoucher(prev => ({ ...prev, title: e.target.value }))}
+                                                        className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-primary"
+                                                    />
+                                                </div>
+                                                <div className="md:col-span-2">
+                                                    <label className="text-[10px] font-bold text-gray-500 uppercase mb-1 block">Description</label>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Voucher Description"
+                                                        value={newVoucher.description}
+                                                        onChange={(e) => setNewVoucher(prev => ({ ...prev, description: e.target.value }))}
                                                         className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-primary"
                                                     />
                                                 </div>
@@ -513,79 +612,94 @@ const Admin: React.FC = () => {
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-white/5">
-                                                    {vouchers.map(v => {
-                                                        const isExpired = new Date(v.expiryDate) < new Date();
-                                                        const status = v.isSuspended ? 'SUSPENDED' : (isExpired ? 'EXPIRED' : 'ACTIVE');
-                                                        const isExpanded = expandedVoucherId === v.id;
+                                                    {vouchers
+                                                        .filter(v => {
+                                                            const matchesSearch = v.title.toLowerCase().includes(voucherSearch.toLowerCase()) ||
+                                                                v.code.toLowerCase().includes(voucherSearch.toLowerCase());
+                                                            const isExpired = new Date(v.expiryDate) < new Date();
+                                                            const status = v.isSuspended ? 'suspended' : (isExpired ? 'expired' : 'active');
+                                                            const matchesStatus = voucherStatusFilter === 'all' || status === voucherStatusFilter;
+                                                            return matchesSearch && matchesStatus;
+                                                        })
+                                                        .map(v => {
+                                                            const isExpired = new Date(v.expiryDate) < new Date();
+                                                            const status = v.isSuspended ? 'SUSPENDED' : (isExpired ? 'EXPIRED' : 'ACTIVE');
+                                                            const isExpanded = expandedVoucherId === v.id;
 
-                                                        return (
-                                                            <React.Fragment key={v.id}>
-                                                                <tr className="hover:bg-white/5 transition-colors cursor-pointer" onClick={() => setExpandedVoucherId(isExpanded ? null : v.id)}>
-                                                                    <td className="px-6 py-4">
-                                                                        <div className="font-bold text-white uppercase tracking-wider">{v.title}</div>
-                                                                        <div className="text-[10px] text-primary font-mono">{v.code}</div>
-                                                                    </td>
-                                                                    <td className="px-6 py-4">
-                                                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-500' :
-                                                                            status === 'SUSPENDED' ? 'bg-amber-500/10 text-amber-500' : 'bg-red-500/10 text-red-500'
-                                                                            }`}>
-                                                                            {status}
-                                                                        </span>
-                                                                    </td>
-                                                                    <td className="px-6 py-4 text-xs">{v.expiryDate}</td>
-                                                                    <td className="px-6 py-4">
-                                                                        <div className="flex items-center gap-2">
-                                                                            <span className="font-bold text-white">{v.usageCount}</span>
-                                                                            <span className="text-[10px] text-gray-600 uppercase">Claims</span>
-                                                                        </div>
-                                                                    </td>
-                                                                    <td className="px-6 py-4 text-right">
-                                                                        <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-                                                                            <button
-                                                                                onClick={() => toggleSuspendVoucher(v.id)}
-                                                                                className={`px-3 py-1 rounded text-[10px] font-bold uppercase transition-all ${v.isSuspended ? 'bg-emerald-600/10 text-emerald-500 hover:bg-emerald-600 hover:text-white' : 'bg-amber-600/10 text-amber-500 hover:bg-amber-600 hover:text-white'
-                                                                                    }`}
-                                                                            >
-                                                                                {v.isSuspended ? 'Resume' : 'Suspend'}
-                                                                            </button>
+                                                            return (
+                                                                <React.Fragment key={v.id}>
+                                                                    <tr className="hover:bg-white/5 transition-colors cursor-pointer" onClick={() => setExpandedVoucherId(isExpanded ? null : v.id)}>
+                                                                        <td className="flex items-center gap-2 px-6 py-4">
                                                                             <button className="text-gray-400 hover:text-white transition-colors">
                                                                                 <span className="material-symbols-outlined text-sm">{isExpanded ? 'expand_less' : 'expand_more'}</span>
                                                                             </button>
-                                                                        </div>
-                                                                    </td>
-                                                                </tr>
-                                                                <AnimatePresence>
-                                                                    {isExpanded && (
-                                                                        <tr>
-                                                                            <td colSpan={5} className="px-6 py-0 bg-black/20">
-                                                                                <motion.div
-                                                                                    initial={{ height: 0, opacity: 0 }}
-                                                                                    animate={{ height: 'auto', opacity: 1 }}
-                                                                                    exit={{ height: 0, opacity: 0 }}
-                                                                                    className="overflow-hidden"
+                                                                            <div className="font-bold text-white uppercase tracking-wider">{v.title}</div>
+                                                                            <div className="text-[10px] text-primary font-mono">{v.code}</div>
+                                                                        </td>
+                                                                        <td className="px-6 py-4">
+                                                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-500' :
+                                                                                status === 'SUSPENDED' ? 'bg-amber-500/10 text-amber-500' : 'bg-red-500/10 text-red-500'
+                                                                                }`}>
+                                                                                {status}
+                                                                            </span>
+                                                                        </td>
+                                                                        <td className="px-6 py-4 text-xs">{formatDate(v.expiryDate)}</td>
+                                                                        <td className="px-6 py-4">
+                                                                            <div className="flex items-center gap-2">
+                                                                                <span className="font-bold text-white">{v.usageCount}</span>
+                                                                                <span className="text-[10px] text-gray-600 uppercase">Claims</span>
+                                                                            </div>
+                                                                        </td>
+                                                                        <td className="px-6 py-4 text-right">
+                                                                            <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                                                                                <button
+                                                                                    onClick={() => toggleSuspendVoucher(v.id)}
+                                                                                    className={`px-3 py-1 rounded text-[10px] font-bold uppercase transition-all ${v.isSuspended ? 'bg-emerald-600/10 text-emerald-500 hover:bg-emerald-600 hover:text-white' : 'bg-amber-600/10 text-amber-500 hover:bg-amber-600 hover:text-white'
+                                                                                        }`}
                                                                                 >
-                                                                                    <div className="py-4 border-l-2 border-primary/30 ml-2 pl-6">
-                                                                                        <h5 className="text-[10px] font-bold text-gray-500 uppercase mb-3 tracking-widest">Members who claimed this:</h5>
-                                                                                        {v.usedBy.length > 0 ? (
-                                                                                            <div className="flex flex-wrap gap-2">
-                                                                                                {v.usedBy.map((name, i) => (
-                                                                                                    <span key={i} className="px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-xs text-white">
-                                                                                                        {name}
-                                                                                                    </span>
-                                                                                                ))}
-                                                                                            </div>
-                                                                                        ) : (
-                                                                                            <p className="text-xs text-gray-600 italic">No usage recorded yet.</p>
-                                                                                        )}
-                                                                                    </div>
-                                                                                </motion.div>
-                                                                            </td>
-                                                                        </tr>
-                                                                    )}
-                                                                </AnimatePresence>
-                                                            </React.Fragment>
-                                                        );
-                                                    })}
+                                                                                    {v.isSuspended ? 'Resume' : 'Suspend'}
+                                                                                </button>
+                                                                                <button
+                                                                                    onClick={() => handleDeleteVoucher(v.id)}
+                                                                                    className="px-3 py-1 rounded text-[10px] font-bold uppercase bg-red-600/10 text-red-500 hover:bg-red-600 hover:text-white transition-all"
+                                                                                >
+                                                                                    Delete
+                                                                                </button>
+                                                                            </div>
+                                                                        </td>
+                                                                    </tr>
+                                                                    <AnimatePresence>
+                                                                        {isExpanded && (
+                                                                            <tr>
+                                                                                <td colSpan={5} className="px-6 py-0 bg-black/20">
+                                                                                    <motion.div
+                                                                                        initial={{ height: 0, opacity: 0 }}
+                                                                                        animate={{ height: 'auto', opacity: 1 }}
+                                                                                        exit={{ height: 0, opacity: 0 }}
+                                                                                        className="overflow-hidden"
+                                                                                    >
+                                                                                        <div className="py-4 border-l-2 border-primary/30 ml-2 pl-6">
+                                                                                            <h5 className="text-[10px] font-bold text-gray-500 uppercase mb-3 tracking-widest">Members who claimed this:</h5>
+                                                                                            {v.usedBy.length > 0 ? (
+                                                                                                <div className="flex flex-wrap gap-2">
+                                                                                                    {v.usedBy.map((name, i) => (
+                                                                                                        <span key={i} className="px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-xs text-white">
+                                                                                                            {name}
+                                                                                                        </span>
+                                                                                                    ))}
+                                                                                                </div>
+                                                                                            ) : (
+                                                                                                <p className="text-xs text-gray-600 italic">No usage recorded yet.</p>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    </motion.div>
+                                                                                </td>
+                                                                            </tr>
+                                                                        )}
+                                                                    </AnimatePresence>
+                                                                </React.Fragment>
+                                                            );
+                                                        })}
                                                 </tbody>
                                             </table>
                                         </div>
@@ -614,13 +728,26 @@ const Admin: React.FC = () => {
                                 onClick={(e) => e.stopPropagation()}
                             >
                                 <div className="flex justify-between items-start mb-6">
-                                    <div>
-                                        <h3 className="text-xl font-bold text-white mb-1">
-                                            {selectedMember.name}
-                                        </h3>
-                                        <p className="text-sm text-gray-400">
-                                            Member Details
-                                        </p>
+                                    <div className="flex items-center gap-4">
+                                        <div
+                                            className="w-16 h-16 rounded-full border-2 border-primary/20 overflow-hidden bg-primary/10 flex items-center justify-center shrink-0 cursor-pointer relative"
+                                            onMouseEnter={() => setIsPpHovered(true)}
+                                            onMouseLeave={() => setIsPpHovered(false)}
+                                        >
+                                            {selectedMember.profile_picture ? (
+                                                <img src={getFullUrl(selectedMember.profile_picture) || ''} alt={selectedMember.name} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <span className="material-symbols-outlined text-3xl text-primary/40">person</span>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <h3 className="text-xl font-bold text-white mb-1">
+                                                {selectedMember.name}
+                                            </h3>
+                                            <p className="text-sm text-gray-400">
+                                                Member Details
+                                            </p>
+                                        </div>
                                     </div>
                                     <button
                                         onClick={() => setShowMemberModal(false)}
@@ -637,12 +764,12 @@ const Admin: React.FC = () => {
                                             <p className="text-sm text-white">{selectedMember.email}</p>
                                         </div>
                                         <div>
-                                            <p className="text-xs text-gray-500 uppercase mb-1">Phone</p>
-                                            <p className="text-sm text-white">{selectedMember.phone || 'N/A'}</p>
+                                            <p className="text-xs text-gray-500 uppercase mb-1">Mobile Number</p>
+                                            <p className="text-sm text-white">{selectedMember.mobile || 'N/A'}</p>
                                         </div>
                                         <div>
                                             <p className="text-xs text-gray-500 uppercase mb-1">Joined</p>
-                                            <p className="text-sm text-white">{selectedMember.joinedDate}</p>
+                                            <p className="text-sm text-white">{formatDate(selectedMember.created_at)}</p>
                                         </div>
                                         <div>
                                             <p className="text-xs text-gray-500 uppercase mb-1">Status</p>
@@ -659,11 +786,11 @@ const Admin: React.FC = () => {
                                         </div>
                                         <div>
                                             <p className="text-xs text-gray-500 uppercase mb-1">Last Payment</p>
-                                            <p className="text-sm text-white">{selectedMember.last_payment_date}</p>
+                                            <p className="text-sm text-white">{formatDate(selectedMember.last_payment_date)}</p>
                                         </div>
                                         <div>
                                             <p className="text-xs text-gray-500 uppercase mb-1">Next Billing</p>
-                                            <p className="text-sm text-white">{selectedMember.nextBilling}</p>
+                                            <p className="text-sm text-white">{formatDate(selectedMember.membership_end_date)}</p>
                                         </div>
                                     </div>
 
@@ -685,11 +812,29 @@ const Admin: React.FC = () => {
                                     </div>
                                 </div>
                             </motion.div>
+
+                            {/* Hover Zoom Popup (Fixed at overlay level to avoid clipping) */}
+                            <AnimatePresence>
+                                {isPpHovered && selectedMember.profile_picture && (
+                                    <motion.div
+                                        className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 rounded-2xl border-4 border-primary/50 shadow-[0_0_50px_rgba(168,85,247,0.4)] overflow-hidden z-[100] bg-[#161118] pointer-events-none"
+                                        initial={{ opacity: 0, scale: 0.5 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        exit={{ opacity: 0, scale: 0.5 }}
+                                    >
+                                        <img
+                                            src={getFullUrl(selectedMember.profile_picture) || ''}
+                                            alt={selectedMember.name}
+                                            className="w-full h-full object-cover"
+                                        />
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
                         </motion.div>
                     )}
                 </AnimatePresence>
             </div>
-        </DashboardLayout>
+        </DashboardLayout >
     );
 };
 
