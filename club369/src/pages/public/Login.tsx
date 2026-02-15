@@ -270,22 +270,7 @@ const Login: React.FC = () => {
               CLUB369
             </motion.h1>
 
-            <motion.p
-              className="text-white/50 text-xs font-bold tracking-[0.3em] uppercase"
-              initial={{ opacity: 0 }}
-              animate={{
-                opacity: [0.3, 0.5, 0.3],
-              }}
-              transition={{
-                opacity: {
-                  duration: 3,
-                  repeat: Infinity,
-                },
-                default: { delay: 0.7 }
-              }}
-            >
-              Members Only
-            </motion.p>
+            
 
             {error && (
               <motion.div
@@ -374,51 +359,6 @@ const Login: React.FC = () => {
             </motion.div>
 
 
-            {/* DEMO HELPER */}
-            <motion.div
-              className="p-3 bg-white/5 rounded-lg border border-white/5 text-[10px] text-gray-400 relative overflow-hidden"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1.0 }}
-              whileHover={{ borderColor: "rgba(139, 92, 246, 0.3)" }}
-            >
-              {/* Animated background */}
-              <motion.div
-                className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent opacity-0"
-                whileHover={{ opacity: 1 }}
-                transition={{ duration: 0.3 }}
-              />
-
-              <p className="font-bold mb-1 text-primary relative z-10">MVP DEMO ACCESS:</p>
-              <div className="grid grid-cols-2 gap-1 relative z-10">
-                <motion.span
-                  onClick={() => setEmail('new@club369.com')}
-                  className="cursor-pointer hover:text-white transition-colors"
-                  whileHover={{ x: 5, color: "#ffffff" }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  • new@club369.com
-                </motion.span>
-                <motion.span
-                  onClick={() => setEmail('member@club369.com')}
-                  className="cursor-pointer hover:text-white transition-colors"
-                  whileHover={{ x: 5, color: "#ffffff" }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  • member@club369.com
-                </motion.span>
-                <div className="col-span-2">
-                  <motion.span
-                    onClick={() => setEmail('admin@club369.com')}
-                    className="cursor-pointer hover:text-white transition-colors block text-center"
-                    whileHover={{ x: 5, color: "#ffffff" }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    • admin@club369.com (Admin)
-                  </motion.span>
-                </div>
-              </div>
-            </motion.div>
 
             {/* Submit Button */}
             <motion.button

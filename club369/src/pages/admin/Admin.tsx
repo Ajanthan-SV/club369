@@ -30,7 +30,7 @@ const Admin: React.FC = () => {
     const navigate = useNavigate();
 
     const [searchTerm, setSearchTerm] = useState('');
-    const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'failed' | 'inactive'>('all');
+    const [filterStatus, setFilterStatus] = useState<'ALL' | 'ACTIVE' | 'EXPIRED' | 'NONE'>('ALL');
     const [selectedMember, setSelectedMember] = useState<Member | null>(null);
     const [showMemberModal, setShowMemberModal] = useState(false);
     const [isPpHovered, setIsPpHovered] = useState(false);
@@ -93,7 +93,7 @@ const Admin: React.FC = () => {
             member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
             member.phone?.toLowerCase().includes(searchTerm.toLowerCase());
 
-        const matchesFilter = filterStatus === 'all' || member.status === filterStatus;
+        const matchesFilter = filterStatus === 'ALL' || member.membership_status === filterStatus;
 
         return matchesSearch && matchesFilter;
     });
@@ -115,10 +115,14 @@ const Admin: React.FC = () => {
         setShowMemberModal(true);
     };
 
-    const handleRetryPayment = (memberId: number) => {
-        alert(`Retrying payment for member ID: ${memberId}`);
-        // Implement actual retry logic here
-    };
+    // const handleRetryPayment = (memberId: number) => {
+    //     alert(`Retrying payment for member ID: ${memberId}`);
+    //     // Implement actual retry logic here
+    // };
+    // const handleCancelMembership = (memberId: number) => {
+    //     alert(`Cancelling membership for member ID: ${memberId}`);
+    //     // Implement actual cancel logic here
+    // };
 
     // Voucher actions
     const handleCreateVoucher = async () => {
@@ -189,6 +193,11 @@ const Admin: React.FC = () => {
         a.href = url;
         a.download = `members-${new Date().toISOString().split('T')[0]}.csv`;
         a.click();
+    };
+
+    const handleResetTxnFilters = () => {
+        setTxnSearch('');
+        setDateRange({ start: '', end: '' });
     };
     const navItems = [
         { label: 'Overview', path: '/admin', icon: 'dashboard' },
@@ -361,13 +370,25 @@ const Admin: React.FC = () => {
                                 <div className="bg-[#161118] border border-white/10 rounded-xl overflow-hidden">
                                     <div className="p-4 border-b border-white/10 bg-white/5 flex justify-between items-center">
                                         <h3 className="font-bold text-white">Member Directory</h3>
-                                        <input
-                                            type="text"
-                                            placeholder="Quick search..."
-                                            value={searchTerm}
-                                            onChange={(e) => setSearchTerm(e.target.value)}
-                                            className="bg-black/20 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white outline-none focus:border-primary"
-                                        />
+                                        <div className="flex items-center gap-3">
+                                            <select
+                                                value={filterStatus}
+                                                onChange={(e) => setFilterStatus(e.target.value as any)}
+                                                className="bg-black/20 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-gray-400 outline-none focus:border-primary cursor-pointer transition-all pr-4"
+                                            >
+                                                <option value="ALL">All Status</option>
+                                                <option value="ACTIVE">Active</option>
+                                                <option value="EXPIRED">Expired</option>
+                                                <option value="NONE">None</option>
+                                            </select>
+                                            <input
+                                                type="text"
+                                                placeholder="Quick search..."
+                                                value={searchTerm}
+                                                onChange={(e) => setSearchTerm(e.target.value)}
+                                                className="bg-black/20 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white outline-none focus:border-primary"
+                                            />
+                                        </div>
                                     </div>
                                     <div className="overflow-x-auto">
                                         <table className="w-full text-left text-sm text-gray-400">
@@ -376,7 +397,7 @@ const Admin: React.FC = () => {
                                                     <th className="px-6 py-4">Profile</th>
                                                     <th className="px-6 py-4">Contact</th>
                                                     <th className="px-6 py-4">Last Payment</th>
-                                                    <th className="px-6 py-4">Account Status</th>
+                                                    <th className="px-6 py-4">Membership Status</th>
                                                     <th className="px-6 py-4 text-right">Actions</th>
                                                 </tr>
                                             </thead>
@@ -456,6 +477,13 @@ const Admin: React.FC = () => {
                                                     />
                                                 </div>
                                             </div>
+                                            <button
+                                                onClick={handleResetTxnFilters}
+                                                className="px-3 py-3 bg-white/5 border border-white/10 rounded-lg text-[10px] font-bold text-gray-400 uppercase tracking-widest hover:bg-white/10 hover:text-white transition-all flex items-center gap-1.5"
+                                            >
+                                                <span className="material-symbols-outlined text-[14px]">restart_alt</span>
+                                                Reset
+                                            </button>
                                         </div>
                                     </div>
                                     <div className="overflow-x-auto">
@@ -772,16 +800,11 @@ const Admin: React.FC = () => {
                                             <p className="text-sm text-white">{formatDate(selectedMember.created_at)}</p>
                                         </div>
                                         <div>
-                                            <p className="text-xs text-gray-500 uppercase mb-1">Status</p>
+                                            <p className="text-xs text-gray-500 uppercase mb-1">Account Status</p>
                                             <span
-                                                className={`inline-block px-2 py-1 rounded text-xs font-bold ${selectedMember.membership_status === 'ACTIVE'
-                                                    ? 'bg-emerald-500/10 text-emerald-500'
-                                                    : selectedMember.membership_status === 'EXPIRED'
-                                                        ? 'bg-red-500/10 text-red-500'
-                                                        : 'bg-gray-500/10 text-gray-500'
-                                                    }`}
+                                                className={`inline-block px-2 py-1 rounded text-xs font-bold ${selectedMember.status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'}`}
                                             >
-                                                {selectedMember.membership_status}
+                                                {selectedMember.status}
                                             </span>
                                         </div>
                                         <div>
@@ -801,13 +824,32 @@ const Admin: React.FC = () => {
                                         >
                                             Send Reminder
                                         </button> */}
-                                        {selectedMember.membership_status === 'EXPIRED' && (
-                                            <button
-                                                onClick={() => handleRetryPayment(selectedMember.id)}
-                                                className="flex-1 px-4 py-2 bg-emerald-600 text-white text-sm font-bold rounded-lg hover:bg-emerald-500 transition-all"
-                                            >
-                                                Retry Payment
-                                            </button>
+                                        {selectedMember.membership_status !== 'ACTIVE' && (
+
+                                            <>
+                                                {selectedMember.mobile && (
+                                                    <button
+                                                        onClick={() => window.location.href = `tel:${selectedMember.mobile}`}
+                                                        className="flex-1 px-4 py-2 bg-emerald-600 text-white text-sm font-bold rounded-lg hover:bg-blue-500 transition-all"
+                                                    >
+                                                        Call Member
+                                                    </button>
+                                                )}
+                                                {/* <button
+                                                    onClick={() => handleRetryPayment(selectedMember.id)}
+                                                    className="flex-1 px-4 py-2 bg-emerald-600 text-white text-sm font-bold rounded-lg hover:bg-emerald-500 transition-all"
+                                                >
+                                                    Retry Payment
+                                                </button>
+                                                <button
+                                                    onClick={() => handleCancelMembership(selectedMember.id)}
+                                                    className="flex-1 px-4 py-2 bg-red-600 text-white text-sm font-bold rounded-lg hover:bg-red-500 transition-all"
+                                                >
+                                                    Cancel Membership
+                                                </button> */}
+                                            </>
+
+
                                         )}
                                     </div>
                                 </div>

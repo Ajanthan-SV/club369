@@ -68,6 +68,15 @@ class Membership(models.Model):
     auto_pay_enabled = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    @property
+    def effective_status(self):
+        if self.status == 'ACTIVE' and self.end_date < timezone.now().date():
+            return 'EXPIRED'
+        return self.status
+
+    def __str__(self):
+        return f"{self.user.email} - {self.plan_name} ({self.effective_status})"
+
 class Payment(models.Model):
     PAYMENT_MODE_CHOICES = (
         ('UPI', 'UPI'),

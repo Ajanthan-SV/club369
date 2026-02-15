@@ -31,12 +31,12 @@ class UserSerializer(serializers.ModelSerializer):
 
     def get_membership_status(self, obj):
         membership = obj.memberships.filter(status='ACTIVE').order_by('-end_date').first()
-        return membership.status if membership else 'NONE'
+        return membership.effective_status if membership else 'NONE'
 
     def get_last_payment_date(self, obj):
         last_payment = obj.payments.filter(payment_status='SUCCESS').order_by('-paid_at').first()
         return last_payment.paid_at.isoformat() if last_payment and last_payment.paid_at else None
-
+    # this is for admin to get the membership end date
     def get_membership_end_date(self, obj):
         membership = obj.memberships.filter(status='ACTIVE').order_by('-end_date').first()
         if not membership:
@@ -86,7 +86,7 @@ class MembershipDetailSerializer(serializers.ModelSerializer):
         return 'active' if obj.auto_pay_enabled else 'inactive'
 
     def get_status(self, obj):
-        return obj.status.lower()
+        return obj.effective_status.upper()
 
 class PaymentSerializer(serializers.ModelSerializer):
     class Meta:

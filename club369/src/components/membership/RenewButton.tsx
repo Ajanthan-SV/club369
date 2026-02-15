@@ -17,7 +17,7 @@ const RenewButton: React.FC<RenewButtonProps> = ({ status, expiryDate, amount, e
     const navigate = useNavigate();
 
     const canRenew = () => {
-        if (status === 'EXPIRED' || status === 'expired' || status === 'NONE') return true;
+        if (status === 'EXPIRED' || status === 'NONE') return true;
 
         // If active, allow renewal if within 5 days of expiry
         const expiry = new Date(expiryDate);

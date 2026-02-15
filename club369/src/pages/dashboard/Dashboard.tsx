@@ -58,7 +58,7 @@ const Overview: React.FC<{ user: any, details: any, transactions: any[], daysRem
                         <div className="text-gray-500 text-[10px] font-bold uppercase tracking-widest mb-1">Status</div>
                         <div className="flex items-center gap-3">
                             <h4 className="text-2xl font-bold">Member Account</h4>
-                            <span className={`px-2 py-0.5 ${details?.status === 'active' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'} text-[10px] font-bold border rounded-full uppercase`}>
+                            <span className={`px-2 py-0.5 ${details?.status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'} text-[10px] font-bold border rounded-full uppercase`}>
                                 {details?.status || 'INACTIVE'}
                             </span>
                         </div>
