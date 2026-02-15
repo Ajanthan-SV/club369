@@ -18,6 +18,13 @@ class StandardizedJSONRenderer(JSONRenderer):
                 
             if not message and not success:
                 message = data.get('error', data.get('detail', "An error occurred"))
+        elif isinstance(data, list) and not success:
+            if data and isinstance(data[0], str):
+                message = data[0]
+            else:
+                message = "Validation error occurred"
+        elif isinstance(data, str) and not success:
+            message = data
         
         # Extract errors if not success
         errors = None

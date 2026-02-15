@@ -109,6 +109,22 @@ const Admin: React.FC = () => {
         }
     };
 
+    const handleDeleteUser = async (memberId: string) => {
+        if (window.confirm('Are you sure you want to permanently delete this user? This action cannot be undone.')) {
+            try {
+                await AdminService.deleteUser(memberId);
+                setMembers(prev => prev.filter(m => m.id !== memberId));
+                setShowMemberModal(false);
+                setSelectedMember(null);
+                alert('User deleted successfully.');
+            } catch (error: any) {
+                console.error("Failed to delete user", error);
+                const errorMsg = error.message || "Failed to delete user";
+                alert(errorMsg);
+            }
+        }
+    };
+
     // Member actions
     const handleViewDetails = (member: Member) => {
         setSelectedMember(member);
@@ -833,6 +849,15 @@ const Admin: React.FC = () => {
                                                         className="flex-1 px-4 py-2 bg-emerald-600 text-white text-sm font-bold rounded-lg hover:bg-blue-500 transition-all"
                                                     >
                                                         Call Member
+                                                    </button>
+                                                )}
+                                                {selectedMember.status !== 'ACTIVE' && (
+                                                    <button
+                                                        onClick={() => handleDeleteUser(selectedMember.id)}
+                                                        className="flex-1 px-4 py-2 bg-red-600/10 border border-red-600/20 text-red-500 text-sm font-bold rounded-lg hover:bg-red-600 hover:text-white transition-all flex items-center justify-center gap-2"
+                                                    >
+                                                        <span className="material-symbols-outlined text-lg">delete</span>
+                                                        <span>Delete User</span>
                                                     </button>
                                                 )}
                                                 {/* <button

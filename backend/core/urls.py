@@ -5,7 +5,8 @@ from .views import (
     CreatePaymentView, VoucherListView, ClaimVoucherView,
     AdminUserListView, AdminTransactionListView, AdminCollectionsView, LoginView,
     CustomTokenRefreshView, MembershipDetailView, UserTransactionListView,
-    AdminVoucherListView, AdminVoucherCreateView, AdminVoucherDeleteView, AdminVoucherToggleView
+    AdminVoucherListView, AdminVoucherCreateView, AdminVoucherDeleteView, AdminVoucherToggleView,
+    AdminUserDeleteView
 )
 
 
@@ -36,4 +37,5 @@ urlpatterns = [
     path('admin/vouchers/create/', AdminVoucherCreateView.as_view(), name='admin-voucher-create'),
     path('admin/vouchers/<int:pk>/toggle/', AdminVoucherToggleView.as_view(), name='admin-voucher-toggle'),
     path('admin/vouchers/<int:pk>/delete/', AdminVoucherDeleteView.as_view(), name='admin-voucher-delete'),
+    path('admin/users/<int:pk>/delete/', AdminUserDeleteView.as_view(), name='admin-user-delete'),
 ]

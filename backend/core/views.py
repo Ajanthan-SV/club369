@@ -263,6 +263,21 @@ class AdminUserListView(generics.ListAPIView):
     def get_queryset(self):
         return User.objects.exclude(is_superuser=True).exclude(is_staff=True).exclude(id=self.request.user.id)
 
+class AdminUserDeleteView(generics.DestroyAPIView):
+    queryset = User.objects.all()
+    permission_classes = (permissions.IsAdminUser,)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        return Response({'status': 'User deleted successfully'}, status=status.HTTP_200_OK)
+
+    def perform_destroy(self, instance):
+        if instance.status == 'ACTIVE':
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError("Cannot delete a user with ACTIVE account status.")
+        instance.delete()
+
 class AdminTransactionListView(generics.ListAPIView):
     queryset = TransactionLedger.objects.all()
     serializer_class = TransactionLedgerSerializer
